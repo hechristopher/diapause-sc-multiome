@@ -1,0 +1,790 @@
+---
+title: "1_preprocessing_nov24"
+format: html
+editor: visual
+---
+
+## Load Libraries
+
+```{r}
+library(SoupX)
+library(Seurat)
+library(DropletUtils)
+library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
+library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+library(Signac)
+library(tidyverse)
+library(dplyr)
+library(DoubletFinder)
+library(scDblFinder)
+
+```
+
+## Filepaths for CellRangerArc-aggr Outputs
+
+use relative paths
+
+```{r}
+# # nov24 aggregated
+# filtered_path <- "../2024_10_31_Cellranger_Outs/aggr/filtered_feature_bc_matrix.h5"
+# raw_path <- "../2024_10_31_Cellranger_Outs/aggr/raw_feature_bc_matrix.h5"
+# fragments_path <- "../2024_10_31_Cellranger_Outs/aggr/atac_fragments.tsv.gz"
+# 
+# annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
+# 
+# outs_dir <- "../results_nov24"
+
+
+# all aggregated
+filtered_path <- "../aggr_all_outs/filtered_feature_bc_matrix.h5"
+raw_path <- "../aggr_all_outs/raw_feature_bc_matrix.h5"
+fragments_path <- "../aggr_all_outs/atac_fragments.tsv.gz"
+annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
+
+outs_dir <- "../results_all"
+
+```
+
+# SoupX Ambient RNA Removal
+
+First, we will use SoupX to remove ambient RNA which requires filtered and raw counts
+
+```{r}
+filtered_counts <- Seurat::Read10X_h5(filtered_path)
+raw_counts <- Seurat::Read10X_h5(raw_path)
+
+filtered_gex <- filtered_counts$`Gene Expression`
+raw_gex <- raw_counts$`Gene Expression`
+
+#add sample names here in order of aggr library file
+sample_names <- c("dev1d_1", "dia6d_1", "dev1d_2", "dia6d_2", "dev1d_3", "dia1d_1", "dia2d_1", "hb_1")
+```
+
+SoupX runs GEX from each sample individually, so keep only GEX info and split by barcode
+
+```{r}
+tocs <- vector("list", length(sample_names))
+tods <- vector("list", length(sample_names))
+
+#each sample has a suffix after the barcode ("-1", "-2",...)
+#split counts matrix by sample using suffix and rename to sample names
+
+filtered_barcodes <- colnames(filtered_gex)
+split_filtered_barcodes <- split(filtered_barcodes, sub(".*-", "", filtered_barcodes))
+names(split_filtered_barcodes) <- sample_names
+
+for(i in seq_along(sample_names)) {
+   tocs[[i]] <- filtered_gex[,split_filtered_barcodes[[i]]]
+   tods[[i]] <- raw_gex[,split_filtered_barcodes[[i]]]
+}
+```
+
+## Full SoupX Pipeline as Function
+
+```{r}
+runSoupX <- function(tod, toc) {
+  #Make soup channel object
+  sc <- SoupChannel(tod, toc)
+  sc$soupProfile
+  #Soupx needs clusters to run
+  #Do basic seurat pre-processing steps:
+  soupx_so <- CreateSeuratObject(counts = toc)
+  soupx_so <- NormalizeData(soupx_so, verbose = F)
+  soupx_so <- FindVariableFeatures(soupx_so, verbose = F)
+  soupx_so <- ScaleData(soupx_so, verbose = F)
+  soupx_so <- RunPCA(soupx_so, verbose = F)
+  soupx_so <- FindNeighbors(soupx_so, dims = 1:20, verbose = F) 
+  soupx_so <- FindClusters(soupx_so, verbose = F)
+  soupx_so <- RunUMAP(soupx_so, dims = 1:20)
+  #Assign cluster identity and umap to the soupchannel object 
+  meta <- cbind(soupx_so@meta.data, Embeddings(soupx_so[["umap"]]))
+  sc <- setClusters(sc, setNames(meta$seurat_clusters, rownames(meta)))
+  sc = setDR(sc, meta[colnames(sc$toc), c("umap_1", "umap_2")])
+  #Look at rho (calculated automatically)
+  sc <- autoEstCont(sc)
+  #Create a new object of the adjusted counts matrix based on ambient RNA 
+  out <- adjustCounts(sc)
+  return(list(out = out, sc = sc))
+}
+```
+
+## Run SoupX on each sample
+
+```{r}
+soup_adjusted_outs <- vector("list", length(sample_names))
+sc_outs <- vector("list", length(sample_names))
+
+for(i in seq_along(sample_names)){
+  soup_outs <- runSoupX(tods[[i]], tocs[[i]])
+  soup_adjusted_outs[[i]] <- soup_outs$out
+  sc_outs[[i]] <- soup_outs$sc
+}
+```
+
+## Look at top soup genes
+
+```{r}
+for(sc in sc_outs){
+  print(head(sc$soupProfile[order(sc$soupProfile$est, decreasing = T), ], n =10))
+}
+# head(sc_1$soupProfile[order(sc_1$soupProfile$est, decreasing = T), ], n = 20)
+# head(sc_2$soupProfile[order(sc_2$soupProfile$est, decreasing = T), ], n = 20)
+# head(sc_3$soupProfile[order(sc_3$soupProfile$est, decreasing = T), ], n = 20)
+# head(sc_4$soupProfile[order(sc_4$soupProfile$est, decreasing = T), ], n = 20)
+
+# Looking at the top soup genes, we see high expression of mitochondrial genes and ribosomal genes (which is to be expected and means it is working!)
+cntSoggy = rowSums(sc_1$toc > 0)
+cntStrained = rowSums(out_1 > 0)
+mostZeroed = tail(sort((cntSoggy - cntStrained)/cntSoggy), n = 10)
+mostZeroed
+cntSoggy = rowSums(sc_2$toc > 0)
+cntStrained = rowSums(out_2 > 0)
+mostZeroed = tail(sort((cntSoggy - cntStrained)/cntSoggy), n = 10)
+mostZeroed
+cntSoggy = rowSums(sc_3$toc > 0)
+cntStrained = rowSums(out_3 > 0)
+mostZeroed = tail(sort((cntSoggy - cntStrained)/cntSoggy), n = 10)
+mostZeroed
+cntSoggy = rowSums(sc_4$toc > 0)
+cntStrained = rowSums(out_4 > 0)
+mostZeroed = tail(sort((cntSoggy - cntStrained)/cntSoggy), n = 10)
+mostZeroed
+
+```
+
+# Create Seurat/Signac Object
+
+re-aggregate counts from each sample
+
+```{r}
+# Combine all subsets
+soupXCounts <- do.call(cbind, soup_adjusted_outs)
+
+# Reorder the columns to match the original order
+soupXCounts <- soupXCounts[, colnames(filtered_gex)]
+
+filtered_counts$`Gene Expression` <- soupXCounts
+```
+
+## add SoupX adjusted counts to seurat object
+
+First, import and edit annotation
+
+```{r}
+#For GRZ
+gff <- rtracklayer::import(annotation_path)
+
+gff$tx_id <- gff$transcript_id
+gff$gene_name <- gff$gene_id
+gff$Dbxref <- gff$db_xref
+gff <- gff[,c("tx_id", "gene_name", "gene_biotype", "type", "Dbxref", "gbkey")]
+
+#remove non-genes
+gff <- gff[!is.na(gff$gene_name)]
+
+#reformat fill in gene biotype
+genes <- as.data.frame(gff[,c("gene_name", "gene_biotype")])
+
+genes_filled <- genes %>%
+  group_by(gene_name) %>%
+  mutate(gene_biotype = gene_biotype[1]) %>%
+  ungroup()
+
+gff$gene_id <- gff$gene_name
+gff$gene_biotype <- genes_filled$gene_biotype
+```
+
+Create Seurat object with GEX and ATAC
+
+```{r}
+
+so_multi <- CreateSeuratObject(
+  counts = filtered_counts$`Gene Expression`,
+  assay = "RNA"
+)
+
+so_multi[["ATAC"]] <- CreateChromatinAssay(
+  counts = filtered_counts$Peaks,
+  sep = c(":", "-"),
+  fragments = fragments_path,
+  annotation = gff
+)
+```
+
+Add metadata columns for sample of origin and developmental trajectory
+
+```{r}
+#change orig.ident to sample identity based on barcode
+
+so_multi$orig.ident <- sample_names[as.numeric(substr(rownames(so_multi@meta.data), nchar(rownames(so_multi@meta.data)), nchar(rownames(so_multi@meta.data))))]
+
+
+#developmental trajectory of each sample in order of aggr library
+devtraj <- c("dev", "dia", "dev", "dia", "dev", "dia", "dia", "pre-dia")
+
+so_multi$devtraj <- devtraj[as.numeric(substr(rownames(so_multi@meta.data), nchar(rownames(so_multi@meta.data)), nchar(rownames(so_multi@meta.data))))]
+
+
+
+#set levels of orig.ident
+meta <- so_multi@meta.data
+
+meta$orig.ident <- factor(meta$orig.ident,
+                                     levels = c("dev1d_1", "dev1d_2", "dev1d_3",
+                                                "hb_1", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
+so_multi@meta.data <- meta
+```
+
+Save Seurat Object
+
+```{r}
+saveRDS(so_multi, paste0(outs_dir, "/so_postSoup.rds"))
+
+# so_multi <- readRDS(paste0(outs_dir, "/so_postSoup.rds"))
+```
+
+# Doublet identification
+
+```{r}
+#subset seurat object by sample
+so_subsets <- vector("list", length(sample_names))
+
+for(i in seq_along(sample_names)){
+  so_subsets[[i]] <- subset(so_multi, subset = orig.ident == sample_names[i])
+}
+```
+
+```{r}
+#plot nFeature, nCount, percent mt for each sample
+for(so in so_subsets){
+  plotFeatures(so)
+}
+
+```
+
+## Functions for running doublet finder
+
+```{r}
+#run through seurat preprocessing steps and find filtering paramters and dimensionality
+plotFeatures <- function(so){
+  mito_genes <- c("KEG92-p13", "KEG92-p12", "KEG92-p11",
+                  "KEG92-p10", "KEG92-p09", "KEG92-p08",
+                  "KEG92-p07", "KEG92-p06", "KEG92-p05",
+                  "KEG92-p04", "KEG92-p03", "KEG92-p02", "KEG92-p01")
+  so[["percent.mt"]] <- PercentageFeatureSet(so, features = mito_genes, assay = 'RNA')
+  p1 <- VlnPlot(so, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
+  print(quantile(so$nFeature_RNA, 0.99))
+  plot(p1)
+}
+
+runDoubletFinderPreprocessing <- function(so, nFeature_RNA_max, nFeature_RNA_min, percent.mt_max) {
+  # PREPROCESSING
+  # Run through Seurat preprocessing steps
+  so_filtered <- subset(so, subset = nFeature_RNA > nFeature_RNA_min & nFeature_RNA < nFeature_RNA_max & percent.mt < percent.mt_max)
+  p2 <- VlnPlot(so_filtered, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
+  plot(p2)
+  so_filtered <- NormalizeData(object = so_filtered)
+  so_filtered <- FindVariableFeatures(object = so_filtered)
+  so_filtered <- ScaleData(object = so_filtered)
+  so_filtered <- RunPCA(object = so_filtered)
+  p3 <- ElbowPlot(so_filtered, ndims = 30)
+  plot(p3)
+  return(so_filtered)
+}
+
+runDoubletFinder <- function(so, dims, multiplet_rate, pK = 0){
+  so <- FindNeighbors(object = so, dims = 1:dims)
+  so <- FindClusters(object = so)
+  so <- RunUMAP(object = so, dims = 1:dims)
+  p1 <- DimPlot(so)
+  plot(p1)
+  
+  #PK Identification
+  if(pK == 0){
+      sweep.res.list <- paramSweep(so, PCs = 1:dims, sct = FALSE)
+    sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+    sweep.stats
+    bcmvn <- find.pK(sweep.stats)
+    p2 <- ggplot(bcmvn, aes(pK, BCmetric, group = 1)) +
+      geom_point() +
+      geom_line()
+    plot(p2)
+    pK <- bcmvn %>% # select the pK that corresponds to max bcmvn to optimize doublet detection
+      filter(BCmetric == max(BCmetric)) %>%
+      select(pK) 
+    pK <- as.numeric(as.character(pK[[1]]))
+  }
+
+  # HOMOTYPIC DOUBLETS
+  annotations <- so@meta.data$seurat_clusters
+  homotypic.prop <- modelHomotypic(annotations)         
+  nExp_poi <- round(multiplet_rate*nrow(so@meta.data)) # must be adjusted per sample based on 10x multiplet rate (in user guide)
+  nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+  # RUN DOUBLET FINDER 
+  so <- doubletFinder(so,
+                      PCs = 1:dims, # based on dims
+                      pN = 0.25, # default set
+                      pK = pK, # provide optimal pK value through the variable
+                      nExp = nExp_poi.adj, # provide expected # of doublets after homtotypic adjustment
+                      reuse.pANN = FALSE, sct = FALSE) # false because this is the first time running doubletfinder on this sample (dont have a pANN to reuse), also did not run sctransform on the data so false also
+  
+  # VISUALIZE DOUBLETS
+
+  p3 <- DimPlot(so, reduction = 'umap',
+          group.by = colnames(so@meta.data)[length(colnames(so@meta.data))])
+  plot(p3)
+  print(table(so@meta.data[,length(colnames(so@meta.data))]))
+  return(so)
+}
+```
+
+## Run doublet finder on each sample
+
+```{r}
+so_1_filtered <- runDoubletFinderPreprocessing(so_1,
+                              nFeature_RNA_max = 3000,
+                              nFeature_RNA_min = 200,
+                              percent.mt_max = 20)
+
+#set multiplet rate based on # of cells
+#first time run, do not set pk, DF will automatically pick suitable value
+#if DF is unable to pick a suitable value, set it manually
+so_1_postDF <- runDoubletFinder(so_1_filtered,
+                                     dims = 20,
+                                     multiplet_rate = 0.077,
+                                     )
+```
+
+```{r}
+so_2_filtered <- runDoubletFinderPreprocessing(so_2,
+                              nFeature_RNA_max = 2500,
+                              nFeature_RNA_min = 200,
+                              percent.mt_max = 10)
+
+#set multiplet rate based on # of cells
+#first time run, do not set pk, DF will automatically pick suitable value
+#if DF is unable to pick a suitable value, set it manually
+so_2_postDF <- runDoubletFinder(so_2_filtered,
+                                     dims = 20,
+                                     multiplet_rate = 0.054)
+```
+
+```{r}
+so_3_filtered <- runDoubletFinderPreprocessing(so_3,
+                              nFeature_RNA_max = 2500,
+                              nFeature_RNA_min = 200,
+                              percent.mt_max = 10)
+
+#set multiplet rate based on # of cells
+#first time run, do not set pk, DF will automatically pick suitable value
+#if DF is unable to pick a suitable value, set it manually
+so_3_postDF <- runDoubletFinder(so_3_filtered,
+                                     dims = 20,
+                                     multiplet_rate = 0.077)
+```
+
+```{r}
+so_4_filtered <- runDoubletFinderPreprocessing(so_4,
+                              nFeature_RNA_max = 3000,
+                              nFeature_RNA_min = 200,
+                              percent.mt_max = 20)
+
+#set multiplet rate based on # of cells
+#first time run, do not set pk, DF will automatically pick suitable value
+#if DF is unable to pick a suitable value, set it manually
+so_4_postDF <- runDoubletFinder(so_4_filtered,
+                                     dims = 20,
+                                     multiplet_rate = 0.077)
+```
+
+### Merge post DF objects
+
+```{r}
+#create new metadata column with DF classifications
+DF.classifications <- data.frame(
+  row.names = c(rownames(so_1_postDF@meta.data),
+                rownames(so_2_postDF@meta.data),
+                rownames(so_3_postDF@meta.data),
+                rownames(so_4_postDF@meta.data)),
+  DF.classifications = c(so_1_postDF@meta.data[,ncol(so_1_postDF@meta.data)],
+                         so_2_postDF@meta.data[,ncol(so_2_postDF@meta.data)],
+                         so_3_postDF@meta.data[,ncol(so_3_postDF@meta.data)],
+                         so_4_postDF@meta.data[,ncol(so_4_postDF@meta.data)])
+)
+
+#subset to remove cells filtered out during DF classification
+so_multi_postDF <- subset(so_multi, cells = rownames(DF.classifications))
+
+#add new metadata column to seurat object
+so_multi_postDF$DF.classifications <- DF.classifications[rownames(so_multi_postDF@meta.data),]
+table(so_multi_postDF$DF.classifications)
+```
+
+```{r}
+saveRDS(so_multi_postDF, paste0(outs_dir, "/so_multi_postDF.rds"))
+```
+
+## Run scDblFinder on GEX and ATAC
+
+```{r}
+# so_multi <- LoadSeuratRds("../results/so_multi_postDF.rds")
+```
+
+Convert to single cell experiment
+
+```{r}
+sce_multi_gex <- as.SingleCellExperiment(so_multi_postDF, assay = "RNA")
+sce_multi_atac <- as.SingleCellExperiment(so_multi_postDF, assay = "ATAC")
+
+```
+
+scDblFinder for GEX
+
+```{r}
+sce_multi_gex <- scDblFinder(sce_multi_gex, samples = "orig.ident")
+
+table(sce_multi_gex$scDblFinder.class)
+
+
+scDblFinder_results_gex <- data.frame(sce_multi_gex@colData[,length(sce_multi_gex@colData)-3:length(sce_multi_gex@colData)]) #last 3 cols
+colnames(scDblFinder_results_gex) <- paste0(colnames(scDblFinder_results_gex), ".gex")
+```
+
+scDblFinder for ATAC
+
+```{r}
+sce_multi_atac <- scDblFinder(sce_multi_atac, aggregateFeatures=TRUE, nfeatures=25, processing="normFeatures", samples = "orig.ident")
+
+table(sce_multi_atac$scDblFinder.class, sce_multi_atac$DF.classifications)
+
+scDblFinder_results_atac <- data.frame(sce_multi_atac@colData[,length(sce_multi_atac@colData)-3:length(sce_multi_atac@colData)])
+colnames(scDblFinder_results_atac) <- paste0(colnames(scDblFinder_results_atac),
+                                             ".atac")
+```
+
+Save results to seurat object metadata
+
+```{r}
+scDblFinder_results <- cbind(scDblFinder_results_gex, scDblFinder_results_atac )
+
+scDblFinder_results <- scDblFinder_results[rownames(so_multi_postDF@meta.data),]
+
+so_multi_postDF@meta.data <- cbind(so_multi_postDF@meta.data, scDblFinder_results)
+```
+
+```{r}
+saveRDS(so_multi_postDF, paste0(outs_dir, "/so_multi_allDoublets.rds"))
+
+so_multi_postDF <- readRDS(paste0(outs_dir, "/so_multi_allDoublets.rds"))
+```
+
+Amulet for ATAC
+
+```{r}
+
+# # we might also give a GRanges of repeat elements, so that these regions are excluded:
+# suppressPackageStartupMessages(library(GenomicRanges))
+# repeats <- GRanges("chr6", IRanges(1000,2000))
+# it's better to combine these with mitochondrial and sex chromosomes
+
+otherChroms <- GRanges(c("NC.011814.1", "NW.026539914.1"),IRanges(1L,width=19527))
+# here since I don't know what chromosome notation you'll be using I've just put them all,
+# although this will trigger a warning when combining them:
+toExclude <- otherChroms
+# we then launch the method
+res <- amulet(fragments_path, regionsToExclude = otherChroms, fullInMemory = TRUE)
+```
+
+```{r}
+so_multi_postDF <- NormalizeData(so_multi_postDF)
+so_multi_postDF <- FindVariableFeatures(so_multi_postDF)
+so_multi_postDF<- ScaleData(so_multi_postDF)
+so_multi_postDF <- RunPCA(so_multi_postDF)
+so_multi_postDF <- RunUMAP(so_multi_postDF, dims = 1:30, verbose = FALSE, reduction.name = "umap_RNA")
+
+DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "scDblFinder.class.gex")
+
+DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "scDblFinder.class.atac")
+
+DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "DF.classifications")
+
+```
+
+## Final Filtering
+
+calculate percent mt
+
+```{r}
+mito_genes <- c("KEG92-p13", "KEG92-p12", "KEG92-p11",
+                "KEG92-p10", "KEG92-p09", "KEG92-p08",
+                "KEG92-p07", "KEG92-p06", "KEG92-p05",
+                "KEG92-p04", "KEG92-p03", "KEG92-p02", "KEG92-p01")
+so_multi_postDF[["percent.mt"]] <- PercentageFeatureSet(so_multi_postDF, features = mito_genes, assay = 'RNA')
+```
+
+calculate ATAC QC metrics
+
+```{r}
+DefaultAssay(so_multi_postDF) <- "ATAC"
+
+so_multi_postDF <- NucleosomeSignal(so_multi_postDF)
+
+saveRDS(so_multi_postDF, paste0(outs_dir, "/so_atac_qc.rds"))
+
+so_multi_postDF <- TSSEnrichment(so_multi_postDF, fast = T)
+
+saveRDS(so_multi_postDF, paste0(outs_dir, "/so_atac_qc.rds"))
+
+# so_multi_postDF <- readRDS(paste0(outs_dir, "/so_atac_qc.rds"))
+```
+
+```{r}
+Idents(so_multi_postDF) <- "orig.ident"
+
+#GEX QC
+DefaultAssay(so_multi_postDF) <- "RNA"
+VlnPlot(
+  object = so_multi_postDF,
+  features = c("nFeature_RNA","nCount_RNA","percent.mt"),
+  ncol = 4,
+)
+
+#ATAC QC
+DefaultAssay(so_multi_postDF) <- "ATAC"
+VlnPlot(
+  object = so_multi_postDF,
+  features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
+  ncol = 4,
+)
+
+```
+
+Filtering by MAD
+
+```{r}
+isOutlier <- function(seurat_obj, metadata_col, n, log_values = T) {
+  # Extract the metadata dataframe
+  metadata <- seurat_obj@meta.data
+  
+  # Get the column that identifies the samples
+  sample_col <- metadata$orig.ident
+  
+  # Initialize a logical vector to store the results
+  outlier_vector <- logical(nrow(metadata))
+  
+  # Initialize a matrix to store the bounds for each sample
+  samples <- unique(sample_col)
+  bounds_matrix <- matrix(NA, nrow = length(samples), ncol = 3, 
+                          dimnames = list(samples, c('lower_bound', 'upper_bound', 'median_val')))
+  
+  # Loop through each sample
+  for (sample in unique(sample_col)) {
+    # Subset the metadata for the current sample
+    sample_metadata <- metadata[sample_col == sample, ]
+    
+    # Extract the values for the specified metadata column
+    values <- sample_metadata[[metadata_col]]
+    if(log_values){
+      values <- log1p(values)
+    }
+    
+    # Calculate the median and MAD
+    median_val <- median(values, na.rm = TRUE)
+    mad_val <- mad(values, constant = 1, na.rm = TRUE)
+    
+    # Determine the lower and upper bounds for outliers
+    lower_bound <- median_val - n * mad_val
+    upper_bound <- median_val + n * mad_val
+    
+    # Identify outliers
+    outliers <- values < lower_bound | values > upper_bound
+    
+    # Update the outlier vector for the current sample
+    outlier_vector[sample_col == sample] <- outliers
+    
+    # Store the bounds in the matrix
+    bounds_matrix[sample, ] <- c(expm1(lower_bound), expm1(upper_bound), expm1(median_val))
+  }
+  
+  metadata$outliers <- outlier_vector
+  bounds_df <- data.frame(bounds_matrix)
+  bounds_df$orig.ident <- rownames(bounds_df)
+  
+  annotation_df <- bounds_df %>%
+    mutate(lower_bound_text = paste0("Lower: ", round(lower_bound, 2)),
+           upper_bound_text = paste0("Upper: ", round(upper_bound, 2)),
+           y_lower = lower_bound - 0.05 * (max(metadata[[metadata_col]]) - min(metadata[[metadata_col]])), # Adjust y position for lower bound text
+           y_upper = upper_bound + 0.05 * (max(metadata[[metadata_col]]) - min(metadata[[metadata_col]]))) # Adjust y position for upper bound text
+  
+  p <- ggplot(metadata, aes(x = orig.ident, y = .data[[metadata_col]], color = outliers)) +
+    geom_jitter() + scale_color_manual(values=c("#56B4E9", "darkgrey")) + 
+    geom_text(data = annotation_df, aes(x = orig.ident, y = y_lower, label = lower_bound_text),
+              color = "black", vjust = 1) +
+    geom_text(data = annotation_df, aes(x = orig.ident, y = y_upper, label = upper_bound_text),
+              color = "black", vjust = 0)
+  plot(p)
+  
+  return(outlier_vector)
+}
+
+
+
+```
+
+```{r}
+isOutlier(so_multi_postDF, "nFeature_RNA", 4)
+isOutlier(so_multi_postDF, "nFeature_RNA", 5)
+isOutlier(so_multi_postDF, "nFeature_RNA", 6)
+
+
+isOutlier(so_multi_postDF, "percent.mt", 3)
+
+
+isOutlier(so_multi_postDF, "nFeature_ATAC", 4)
+isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
+
+```
+
+```{r}
+meta <- so_multi_postDF@meta.data
+
+
+ggplot(data = so_multi_postDF@meta.data, aes(x = orig.ident, y = nucleosome_signal)) + geom_jitter(color = "#56B4E9")
+
+
+meta$tss_outliers <- meta$TSS.enrichment < 1.5
+ggplot(data = meta, aes(x = orig.ident, y = TSS.enrichment, color = tss_outliers)) + geom_jitter() + 
+  scale_color_manual(values=c("#56B4E9", "darkgrey"))
+```
+
+```{r}
+meta <- so_multi_postDF@meta.data
+
+meta$filter_genes_mad4 <- isOutlier(so_multi_postDF, "nFeature_RNA", 4)
+meta$filter_genes_mad5 <- isOutlier(so_multi_postDF, "nFeature_RNA", 5)
+meta$filter_genes_mad6 <- isOutlier(so_multi_postDF, "nFeature_RNA", 6)
+
+meta$filter_peaks_mad4 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 4)
+meta$filter_peaks_mad5 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
+meta$filter_peaks_mad6 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 6)
+
+meta$filter_mt_mad3 <- isOutlier(so_multi_postDF, "percent.mt", 3)
+meta$filter_mt_mad4 <- isOutlier(so_multi_postDF, "percent.mt", 4)
+
+so_multi_postDF@meta.data <- meta
+```
+
+```{r}
+so_unfiltered <- so_multi_postDF
+
+so_filtered_strict <- subset(
+  x = so_multi_postDF,
+  filter_genes_mad4 == F &
+  filter_peaks_mad4 == F &
+  filter_mt_mad3 == F &
+  nucleosome_signal < 1 &
+  TSS.enrichment > 1.5 &
+  scDblFinder.class.gex == "singlet"
+)
+
+so_filtered_medium <- subset(
+  x = so_multi_postDF,
+  filter_genes_mad5 == F &
+  filter_peaks_mad5 == F &
+  filter_mt_mad3 == F &
+  nucleosome_signal < 1 &
+  TSS.enrichment > 1.5 &
+  scDblFinder.class.gex == "singlet"
+)
+
+so_filtered_lenient <- subset(
+  x = so_multi_postDF,
+  filter_genes_mad6 == F &
+  filter_peaks_mad6 == F &
+  filter_mt_mad4 == F &
+  nucleosome_signal < 1 &
+  TSS.enrichment > 1.5 &
+  scDblFinder.class.gex == "singlet"
+)
+# so_filtered <- subset(
+#   x = so_multi_postDF,
+#   subset = nCount_ATAC < 30000 &
+#     nCount_ATAC > 1000 &
+#     nucleosome_signal < 1 &
+#     TSS.enrichment > 1.5 &
+#     nCount_RNA > 200 &
+#     nCount_RNA < 20000)
+so_unfiltered
+so_filtered_strict
+so_filtered_medium
+so_filtered_lenient
+```
+
+```{r}
+saveRDS(so_unfiltered, paste0(outs_dir, "/so_unfiltered.rds"))
+
+saveRDS(so_filtered_strict, paste0(outs_dir, "/so_filtered_strict.rds"))
+
+saveRDS(so_filtered_medium, paste0(outs_dir, "/so_filtered_medium.rds"))
+
+saveRDS(so_filtered_lenient, paste0(outs_dir, "/so_filtered_lenient.rds"))
+```
+
+```{r}
+runSeuratRNAProcessing <- function(so){
+  DefaultAssay(so) <- "RNA"
+  so <- NormalizeData(so)
+  so <- FindVariableFeatures(so)
+  so <- ScaleData(so)
+  so <- RunPCA(so)
+  so <- RunUMAP(so, dims = 1:30)
+  so <- FindNeighbors(so, dims = 1:30)
+  so <- FindClusters(so)
+  return(so)
+}
+```
+
+```{r}
+so_unfiltered <- runSeuratRNAProcessing(so_unfiltered)
+
+```
+
+```{r}
+DimPlot(so_unfiltered, group.by = "devtraj",
+        cols = c("#FBA91A", "#2C6E49" , "cadetblue1"),  label = TRUE)
+DimPlot(so_unfiltered, group.by = "orig.ident",
+        cols = c("#FBA91A", "#FBA91A", "#FBA91A",
+                 "cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
+DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex")
+```
+
+```{r}
+so_filtered_medium <- runSeuratRNAProcessing(so_filtered_medium)
+```
+
+```{r}
+DimPlot(so_filtered_medium, group.by = "devtraj",
+        cols = c("#FBA91A", "#2C6E49" , "cadetblue1"),  label = TRUE)
+DimPlot(so_filtered_medium, group.by = "orig.ident",
+        cols = c("#FBA91A", "#FBA91A", "#FBA91A",
+                 "cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
+DimPlot(so_filtered_medium, group.by = "scDblFinder.class.gex")
+
+DimPlot(so_filtered_medium)
+```
+
+```{r}
+pseudo <- AggregateExpression(so_filtered_medium, assays = "RNA",return.seurat = T, group.by = "orig.ident")
+
+pseudo <- NormalizeData(pseudo)
+pseudo <- FindVariableFeatures(pseudo)
+pseudo <- RunPCA(pseudo, npcs = 7)
+
+
+DimPlot(pseudo, reduction = "pca", cols = c("#FBA91A", "#FBA91A", "#FBA91A","cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"), label = T, repel = T, pt.size = 4)
+
+```
+
+```{r}
+sessionInfo()
+```

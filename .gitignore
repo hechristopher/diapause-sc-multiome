@@ -1,0 +1,8 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+aggr_all_outs/
+genome/
+genome_2015/
+results_all/
