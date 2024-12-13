@@ -32,7 +32,7 @@ use relative paths
 # 
 # annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
 # 
-# outs_dir <- "../results_nov24"
+# outs_dir <- "../results_nov24/"
 
 
 # all aggregated
@@ -41,8 +41,31 @@ raw_path <- "../aggr_all_outs/raw_feature_bc_matrix.h5"
 fragments_path <- "../aggr_all_outs/atac_fragments.tsv.gz"
 annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
 
-outs_dir <- "../results_all"
+outs_dir <- "../results_all/"
+fig_path <- "../results_all/figures/"
 
+
+#add sample names here in order of aggr library file
+sample_names <- c("dev1d_1", "dia6d_1", "dev1d_2", "dia6d_2", "dev1d_3", "dia1d_1", "dia2d_1", "hb_1")
+```
+
+## Helper Functions
+
+Plot Saving Function
+
+```{r}
+SaveFigure <- function(plots, name, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(fig_path, name, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(fig_path, name, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
 ```
 
 # SoupX Ambient RNA Removal
@@ -55,9 +78,6 @@ raw_counts <- Seurat::Read10X_h5(raw_path)
 
 filtered_gex <- filtered_counts$`Gene Expression`
 raw_gex <- raw_counts$`Gene Expression`
-
-#add sample names here in order of aggr library file
-sample_names <- c("dev1d_1", "dia6d_1", "dev1d_2", "dia6d_2", "dev1d_3", "dia1d_1", "dia2d_1", "hb_1")
 ```
 
 SoupX runs GEX from each sample individually, so keep only GEX info and split by barcode
@@ -229,18 +249,18 @@ so_multi$devtraj <- devtraj[as.numeric(substr(rownames(so_multi@meta.data), ncha
 #set levels of orig.ident
 meta <- so_multi@meta.data
 
-meta$orig.ident <- factor(meta$orig.ident,
-                                     levels = c("dev1d_1", "dev1d_2", "dev1d_3",
-                                                "hb_1", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
+meta$orig.ident <- factor(meta$orig.ident, 
+                          levels = c("dev1d_1", "dev1d_2", "dev1d_3","hb_1", 
+                                     "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
 so_multi@meta.data <- meta
 ```
 
 Save Seurat Object
 
 ```{r}
-saveRDS(so_multi, paste0(outs_dir, "/so_postSoup.rds"))
+saveRDS(so_multi, paste0(outs_dir, "so_postSoup.rds"))
 
-# so_multi <- readRDS(paste0(outs_dir, "/so_postSoup.rds"))
+# so_multi <- readRDS(paste0(outs_dir, "so_postSoup.rds"))
 ```
 
 # Doublet identification
@@ -421,7 +441,7 @@ table(so_multi_postDF$DF.classifications)
 ```
 
 ```{r}
-saveRDS(so_multi_postDF, paste0(outs_dir, "/so_multi_postDF.rds"))
+saveRDS(so_multi_postDF, paste0(outs_dir, "so_multi_postDF.rds"))
 ```
 
 ## Run scDblFinder on GEX and ATAC
@@ -473,9 +493,9 @@ so_multi_postDF@meta.data <- cbind(so_multi_postDF@meta.data, scDblFinder_result
 ```
 
 ```{r}
-saveRDS(so_multi_postDF, paste0(outs_dir, "/so_multi_allDoublets.rds"))
+saveRDS(so_multi_postDF, paste0(outs_dir, "so_multi_allDoublets.rds"))
 
-so_multi_postDF <- readRDS(paste0(outs_dir, "/so_multi_allDoublets.rds"))
+so_multi_postDF <- readRDS(paste0(outs_dir, "so_multi_allDoublets.rds"))
 ```
 
 Amulet for ATAC
@@ -512,54 +532,56 @@ DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "DF.classif
 
 ## Final Filtering
 
-calculate percent mt
+### calculate percent mt
 
 ```{r}
-mito_genes <- c("KEG92-p13", "KEG92-p12", "KEG92-p11",
-                "KEG92-p10", "KEG92-p09", "KEG92-p08",
-                "KEG92-p07", "KEG92-p06", "KEG92-p05",
-                "KEG92-p04", "KEG92-p03", "KEG92-p02", "KEG92-p01")
-so_multi_postDF[["percent.mt"]] <- PercentageFeatureSet(so_multi_postDF, features = mito_genes, assay = 'RNA')
+so_multi_postDF[["percent.mt"]] <- PercentageFeatureSet(so_multi_postDF, pattern = "^KEG92-", assay = 'RNA')
 ```
 
-calculate ATAC QC metrics
+### calculate ATAC QC metrics
 
 ```{r}
 DefaultAssay(so_multi_postDF) <- "ATAC"
 
 so_multi_postDF <- NucleosomeSignal(so_multi_postDF)
 
-saveRDS(so_multi_postDF, paste0(outs_dir, "/so_atac_qc.rds"))
+saveRDS(so_multi_postDF, paste0(outs_dir, "so_atac_qc.rds"))
 
 so_multi_postDF <- TSSEnrichment(so_multi_postDF, fast = T)
 
-saveRDS(so_multi_postDF, paste0(outs_dir, "/so_atac_qc.rds"))
+saveRDS(so_multi_postDF, paste0(outs_dir, "so_atac_qc.rds"))
 
-# so_multi_postDF <- readRDS(paste0(outs_dir, "/so_atac_qc.rds"))
+# so_multi_postDF <- readRDS(paste0(outs_dir, "so_atac_qc.rds"))
 ```
+
+### Plot QC Metrics
 
 ```{r}
 Idents(so_multi_postDF) <- "orig.ident"
 
 #GEX QC
 DefaultAssay(so_multi_postDF) <- "RNA"
-VlnPlot(
+plot <- VlnPlot(
   object = so_multi_postDF,
   features = c("nFeature_RNA","nCount_RNA","percent.mt"),
-  ncol = 4,
+  ncol = 3,
 )
+SaveFigure(plot, "qc_vln_rna", width = 12, height = 6)
 
 #ATAC QC
 DefaultAssay(so_multi_postDF) <- "ATAC"
-VlnPlot(
+plot <- VlnPlot(
   object = so_multi_postDF,
   features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
-  ncol = 4,
+  ncol = 3,
 )
+SaveFigure(plot, "qc_vln_atac", width = 12, height = 6)
 
 ```
 
-Filtering by MAD
+### Filtering by MAD
+
+function for calculating MAD and calling outliers outside of n MADs
 
 ```{r}
 isOutlier <- function(seurat_obj, metadata_col, n, log_values = T) {
@@ -610,38 +632,27 @@ isOutlier <- function(seurat_obj, metadata_col, n, log_values = T) {
   bounds_df <- data.frame(bounds_matrix)
   bounds_df$orig.ident <- rownames(bounds_df)
   
+  #jitter plots with cutoffs annotated
   annotation_df <- bounds_df %>%
     mutate(lower_bound_text = paste0("Lower: ", round(lower_bound, 2)),
            upper_bound_text = paste0("Upper: ", round(upper_bound, 2)),
            y_lower = lower_bound - 0.05 * (max(metadata[[metadata_col]]) - min(metadata[[metadata_col]])), # Adjust y position for lower bound text
            y_upper = upper_bound + 0.05 * (max(metadata[[metadata_col]]) - min(metadata[[metadata_col]]))) # Adjust y position for upper bound text
   
-  p <- ggplot(metadata, aes(x = orig.ident, y = .data[[metadata_col]], color = outliers)) +
-    geom_jitter() + scale_color_manual(values=c("#56B4E9", "darkgrey")) + 
-    geom_text(data = annotation_df, aes(x = orig.ident, y = y_lower, label = lower_bound_text),
+  p <- ggplot(metadata,
+              aes(x = orig.ident, y = .data[[metadata_col]], color = outliers)) +
+    geom_jitter(show.legend = F) + scale_color_manual(values=c("#56B4E9", "darkgrey")) + 
+    geom_text(data = annotation_df,
+              aes(x = orig.ident, y = y_lower, label = lower_bound_text),
               color = "black", vjust = 1) +
-    geom_text(data = annotation_df, aes(x = orig.ident, y = y_upper, label = upper_bound_text),
-              color = "black", vjust = 0)
+    geom_text(data = annotation_df,
+              aes(x = orig.ident, y = y_upper, label = upper_bound_text),
+              color = "black", vjust = 0) + 
+    ggtitle(paste0(metadata_col, " within ", n, " MADS"))
   plot(p)
   
-  return(outlier_vector)
+  return(list("outliers" = outlier_vector, "plot" = p))
 }
-
-
-
-```
-
-```{r}
-isOutlier(so_multi_postDF, "nFeature_RNA", 4)
-isOutlier(so_multi_postDF, "nFeature_RNA", 5)
-isOutlier(so_multi_postDF, "nFeature_RNA", 6)
-
-
-isOutlier(so_multi_postDF, "percent.mt", 3)
-
-
-isOutlier(so_multi_postDF, "nFeature_ATAC", 4)
-isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
 
 ```
 
@@ -649,32 +660,55 @@ isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
 meta <- so_multi_postDF@meta.data
 
 
-ggplot(data = so_multi_postDF@meta.data, aes(x = orig.ident, y = nucleosome_signal)) + geom_jitter(color = "#56B4E9")
+ggplot(data = so_multi_postDF@meta.data,
+       aes(x = orig.ident, y = nucleosome_signal)) +
+  geom_jitter(color = "#56B4E9") + 
+  ggtitle("nucleosome signal < 2")
 
 
 meta$tss_outliers <- meta$TSS.enrichment < 1.5
-ggplot(data = meta, aes(x = orig.ident, y = TSS.enrichment, color = tss_outliers)) + geom_jitter() + 
-  scale_color_manual(values=c("#56B4E9", "darkgrey"))
+ggplot(data = meta,
+       aes(x = orig.ident, y = TSS.enrichment, color = tss_outliers)) + 
+  geom_jitter() + 
+  scale_color_manual(values=c("#56B4E9", "darkgrey")) + 
+  ggtitle("TSS enrichemnt > 1.5")
 ```
 
 ```{r}
+
+genes_4mads <- isOutlier(so_multi_postDF, "nFeature_RNA", 4)
+genes_5mads <-isOutlier(so_multi_postDF, "nFeature_RNA", 5)
+genes_6mads <-isOutlier(so_multi_postDF, "nFeature_RNA", 6)
+
+
+mt_3mads <- isOutlier(so_multi_postDF, "percent.mt", 3)
+mt_4mads <- isOutlier(so_multi_postDF, "percent.mt", 4)
+
+
+peaks_4mads <- isOutlier(so_multi_postDF, "nFeature_ATAC", 4)
+peaks_5mads <- isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
+peaks_6mads <- isOutlier(so_multi_postDF, "nFeature_ATAC", 6)
+
+
 meta <- so_multi_postDF@meta.data
 
-meta$filter_genes_mad4 <- isOutlier(so_multi_postDF, "nFeature_RNA", 4)
-meta$filter_genes_mad5 <- isOutlier(so_multi_postDF, "nFeature_RNA", 5)
-meta$filter_genes_mad6 <- isOutlier(so_multi_postDF, "nFeature_RNA", 6)
+meta$filter_genes_mad4 <- genes_4mads$outliers
+meta$filter_genes_mad5 <- genes_5mads$outliers
+meta$filter_genes_mad6 <- genes_6mads$outliers
 
-meta$filter_peaks_mad4 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 4)
-meta$filter_peaks_mad5 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 5)
-meta$filter_peaks_mad6 <- isOutlier(so_multi_postDF, "nFeature_ATAC", 6)
+meta$filter_peaks_mad4 <- peaks_4mads$outliers
+meta$filter_peaks_mad5 <- peaks_5mads$outliers
+meta$filter_peaks_mad6 <- peaks_5mads$outliers
 
-meta$filter_mt_mad3 <- isOutlier(so_multi_postDF, "percent.mt", 3)
-meta$filter_mt_mad4 <- isOutlier(so_multi_postDF, "percent.mt", 4)
+meta$filter_mt_mad3 <- mt_3mads$outliers
+meta$filter_mt_mad4 <- mt_4mads$outliers
 
 so_multi_postDF@meta.data <- meta
 ```
 
 ```{r}
+library(ggpubr)
+
 so_unfiltered <- so_multi_postDF
 
 so_filtered_strict <- subset(
@@ -686,6 +720,8 @@ so_filtered_strict <- subset(
   TSS.enrichment > 1.5 &
   scDblFinder.class.gex == "singlet"
 )
+
+
 
 so_filtered_medium <- subset(
   x = so_multi_postDF,
@@ -718,16 +754,26 @@ so_unfiltered
 so_filtered_strict
 so_filtered_medium
 so_filtered_lenient
+
+
+strict_plot <- ggarrange(genes_4mads$plot,peaks_4mads$plot,mt_3mads$plot, ncol = 2, nrow = 2)
+SaveFigure(strict_plot, "qc_strict_filter", width = 20, height = 12)
+
+medium_plot <- ggarrange(genes_5mads$plot,peaks_5mads$plot,mt_3mads$plot, ncol = 2, nrow = 2)
+SaveFigure(medium_plot, "qc_medium_filter", width = 20, height = 12)
+
+lenient_plot <- ggarrange(genes_6mads$plot,peaks_6mads$plot,mt_4mads$plot, ncol = 2, nrow = 2)
+SaveFigure(lenient_plot, "qc_lenient_filter", width = 20, height = 12)
 ```
 
 ```{r}
-saveRDS(so_unfiltered, paste0(outs_dir, "/so_unfiltered.rds"))
+saveRDS(so_unfiltered, paste0(outs_dir, "so_unfiltered.rds"))
 
-saveRDS(so_filtered_strict, paste0(outs_dir, "/so_filtered_strict.rds"))
+saveRDS(so_filtered_strict, paste0(outs_dir, "so_filtered_strict.rds"))
 
-saveRDS(so_filtered_medium, paste0(outs_dir, "/so_filtered_medium.rds"))
+saveRDS(so_filtered_medium, paste0(outs_dir, "so_filtered_medium.rds"))
 
-saveRDS(so_filtered_lenient, paste0(outs_dir, "/so_filtered_lenient.rds"))
+saveRDS(so_filtered_lenient, paste0(outs_dir, "so_filtered_lenient.rds"))
 ```
 
 ```{r}
@@ -746,31 +792,46 @@ runSeuratRNAProcessing <- function(so){
 
 ```{r}
 so_unfiltered <- runSeuratRNAProcessing(so_unfiltered)
-
 ```
 
+## Plotting
+
 ```{r}
-DimPlot(so_unfiltered, group.by = "devtraj",
+p_devtraj <- DimPlot(so_unfiltered, group.by = "devtraj",
         cols = c("#FBA91A", "#2C6E49" , "cadetblue1"),  label = TRUE)
-DimPlot(so_unfiltered, group.by = "orig.ident",
+p_orig.ident <- DimPlot(so_unfiltered, group.by = "orig.ident",
         cols = c("#FBA91A", "#FBA91A", "#FBA91A",
                  "cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
-DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex")
+p_scDblFinder <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex")
+p_clusters <- DimPlot(so_unfiltered)
+
+p <- ggarrange(p_devtraj, p_orig.ident, p_scDblFinder, p_clusters, ncol = 2, nrow = 2)
+SaveFigure(p, "unfiltered_umaps", width = 20, height = 10)
+
 ```
 
 ```{r}
+
+
 so_filtered_medium <- runSeuratRNAProcessing(so_filtered_medium)
+
+so_filtered_medium$orig.ident <- factor(so_filtered_medium$orig.ident, 
+                          levels = c("dev1d_1", "dev1d_2", "dev1d_3","hb_1", 
+                                     "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
+
 ```
 
 ```{r}
-DimPlot(so_filtered_medium, group.by = "devtraj",
-        cols = c("#FBA91A", "#2C6E49" , "cadetblue1"),  label = TRUE)
-DimPlot(so_filtered_medium, group.by = "orig.ident",
+p_devtraj <- DimPlot(so_filtered_medium, group.by = "devtraj",
+        cols = c("#FBA91A", "#2C6E49" , "#800080"),  label = TRUE)
+p_orig.ident <- DimPlot(so_filtered_medium, group.by = "orig.ident",
         cols = c("#FBA91A", "#FBA91A", "#FBA91A",
-                 "cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
-DimPlot(so_filtered_medium, group.by = "scDblFinder.class.gex")
+                 "#800080", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
+p_scDblFinder <- DimPlot(so_filtered_medium, group.by = "scDblFinder.class.gex")
+p_clusters <- DimPlot(so_filtered_medium)
 
-DimPlot(so_filtered_medium)
+p <- ggarrange(p_devtraj, p_orig.ident, p_scDblFinder, p_clusters, ncol = 2, nrow = 2)
+SaveFigure(p, "medium_filtered_umaps", width = 15, height = 10)
 ```
 
 ```{r}
@@ -781,8 +842,108 @@ pseudo <- FindVariableFeatures(pseudo)
 pseudo <- RunPCA(pseudo, npcs = 7)
 
 
-DimPlot(pseudo, reduction = "pca", cols = c("#FBA91A", "#FBA91A", "#FBA91A","cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"), label = T, repel = T, pt.size = 4)
+p <- DimPlot(pseudo, reduction = "pca",
+             cols = c("#FBA91A", "#FBA91A", "#FBA91A","#800080", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"),
+             label = T, repel = T, pt.size = 4)
 
+SaveFigure(p, "psuedobulk_PCA", width = 5, height = 3)
+```
+
+```{r}
+dat <- data.frame(so_filtered_medium@meta.data)
+dat$UMAP1 <- Embeddings(so_filtered_medium, "umap")[,1]
+dat$UMAP2 <- Embeddings(so_filtered_medium, "umap")[,2]
+
+#Create a data frame that doesn't contain a "sample" column. This will allow us to facet the density layer without affecting the points
+dat$Sample <- dat$orig.ident
+
+dat_bg <- dat[,-(which(colnames(dat)=="Sample"))]
+
+density_plot <- ggplot(dat, aes(x=UMAP1, y=UMAP2)) +
+  stat_density_2d(geom="raster", aes(fill=stat(ndensity)), contour=F) + #ndensity calculates the normalized density for each sample--otherwise density would be affected by the number of cells for each sample, which is variable
+  geom_point(data=dat_bg, shape=16, size=0.1, alpha=0.05, color="white") +
+  scale_fill_gradientn(colours=viridisLite::mako(100), name="Density") +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  facet_wrap(~Sample, nrow=2, ncol=4) +
+  theme_classic() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size=12, color="black"),
+        axis.text=element_blank(),
+        axis.title=element_blank(),
+        axis.ticks=element_blank(),
+        axis.line = element_blank(),
+        plot.background = element_rect(fill = "transparent", color = NA),
+        legend.text=element_text(size=12, color="black"),
+        legend.title=element_text(size=14, color="black"))
+
+density_plot
+
+ggsave(density_plot,
+       filename="../results_all/figures/medium_filtered_umap_density_bysample.png",
+       dpi=300,
+       width=12, height=8)
+```
+
+umaps by sample
+
+```{r}
+so_dev1d <- subset(x = so_filtered_medium, orig.ident %in% c("dev1d_1", "dev1d_2", "dev1d_3"))
+so_dia1d <- subset(x = so_filtered_medium, orig.ident %in% c("dia1d_1"))
+so_dia2d <- subset(x = so_filtered_medium, orig.ident %in% c("dia2d_1"))
+so_dia6d <- subset(x = so_filtered_medium, orig.ident %in% c("dia6d_1", "dia6d_2"))
+so_hb <- subset(x = so_filtered_medium, orig.ident %in% c("hb_1"))
+```
+
+```{r}
+so_dev1d <- runSeuratRNAProcessing(so_dev1d)
+so_dia1d <- runSeuratRNAProcessing(so_dia1d)
+so_dia2d <- runSeuratRNAProcessing(so_dia2d)
+so_dia6d <- runSeuratRNAProcessing(so_dia6d)
+so_hb <- runSeuratRNAProcessing(so_hb)
+
+```
+
+```{r}
+p1 <- DimPlot(so_dev1d) + ggtitle("dev1d")
+p2 <- DimPlot(so_dia1d) + ggtitle("dia1d")
+p3 <- DimPlot(so_dia2d) + ggtitle("dia2d")
+p4 <- DimPlot(so_dia6d) + ggtitle("dia6d")
+p5 <- DimPlot(so_hb) + ggtitle("hb")
+
+p <- ggarrange(p1, p2, p3, p4, p5, ncol = 3, nrow = 2)
+SaveFigure(p, name = "umaps_bysample", width = 15, height = 10)
+```
+
+```{r}
+so_dia <- subset(x = so_filtered_medium,
+                 orig.ident %in% c("dia1d_1", "dia2d_1", "dia6d_1", "dia6d_1"))
+
+so_1d <- subset(x = so_filtered_medium,
+                 orig.ident %in% c("dia1d_1", "dev1d_1", "dev1d_2", "dev1d_3"))
+
+so_1d_hb <- subset(x = so_filtered_medium,
+                 orig.ident %in% c("dia1d_1", "dev1d_1",
+                                   "dev1d_2", "dev1d_3", "hb_1"))
+
+```
+
+```{r}
+so_dia <- runSeuratRNAProcessing(so_dia)
+so_1d <- runSeuratRNAProcessing(so_1d)
+so_1d_hb <- runSeuratRNAProcessing(so_1d_hb)
+```
+
+```{r}
+p1 <- DimPlot(so_dia, group.by = "orig.ident", cols = c("#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49")) + 
+  ggtitle("all diapause samples")
+p2 <- DimPlot(so_1d, group.by = "orig.ident", cols = c("#FBA91A", "#FBA91A", "#FBA91A", "#A8D5BA")) + 
+  ggtitle("dia1d and dev1d",)
+p3 <- DimPlot(so_1d_hb, group.by = "orig.ident", cols = c("#FBA91A", "#FBA91A", "#FBA91A","#800080", "#A8D5BA")) +
+  ggtitle("hb, dia1d, and dev1d")
+
+p <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
+SaveFigure(p, name = "umaps_bysample_combination", width = 15, height = 5)
 ```
 
 ```{r}

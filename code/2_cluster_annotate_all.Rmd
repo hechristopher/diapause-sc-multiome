@@ -1,0 +1,367 @@
+---
+title: "2_cluster_annotate"
+format: html
+editor: visual
+---
+
+## Load libraries
+
+```{r}
+library(Seurat)
+library(Signac)
+library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
+library(tidyverse)
+```
+
+## Load Seurat File
+
+```{r}
+outs_dir <- "../results_nov24"
+```
+
+```{r}
+so_filtered <- readRDS(paste0(outs_dir, "/so_final_filtered.rds"))
+```
+
+## Standard Seurat Workflow
+
+select doublets to remove
+
+```{r}
+# so_singlets <- subset(
+#     x = so_filtered,
+#     subset =DF.classifications == "Singlet" &
+#     scDblFinder.class.gex == "singlet"  &
+#     scDblFinder.class.atac == "singlet"
+# )
+
+so_singlets <- subset(
+    x = so_filtered,
+    subset =DF.classifications == "Singlet" &
+    scDblFinder.class.gex == "singlet"
+)
+
+```
+
+normalize, find variable features, pick PCs
+
+```{r}
+DefaultAssay(so_singlets) <- "RNA"
+
+so_singlets <- NormalizeData(so_singlets)
+so_singlets <- FindVariableFeatures(so_singlets)
+so_singlets <- ScaleData(so_singlets)
+so_singlets <- RunPCA(so_singlets)
+ElbowPlot(so_singlets, ndims = 30)
+```
+
+UMAP and cluster
+
+```{r}
+so_singlets <- RunUMAP(so_singlets, dims = 1:30)
+so_singlets <- FindNeighbors(so_singlets, dims = 1:30)
+so_singlets <- FindClusters(so_singlets)
+DimPlot(so_singlets, reduction = "umap")
+DimPlot(so_singlets, reduction = "umap", group.by = "devtraj",
+        cols = c("#FBA91A", "cadetblue1", "cadetblue3", "darkolivegreen1"), label = TRUE)
+
+DimPlot(so_singlets, reduction = "umap", label = TRUE)
+DimPlot(so_singlets, reduction = "umap",  split.by = "devtraj", label = T) + NoLegend()
+
+```
+
+```{r}
+table(so_singlets$seurat_clusters, so_singlets$orig.ident)
+
+saveRDS(so_singlets, paste0(outs_dir, "/so_singlets_clustered.rds"))
+```
+
+## Annotate Diapause and Development Separately
+
+Subset dia and dev
+
+```{r}
+so_dia <- subset(so_singlets, subset = devtraj == "Diapause")
+so_dev <- subset(so_singlets, subset = devtraj == "Development")
+```
+
+cluster dia and dev
+
+```{r}
+so_dia <- NormalizeData(so_dia)
+so_dia <- FindVariableFeatures(so_dia)
+so_dia <- ScaleData(so_dia)
+so_dia <- RunPCA(so_dia)
+so_dia <- RunUMAP(so_dia, dims = 1:30)
+so_dia <- FindNeighbors(so_dia, dims = 1:30)
+so_dia <- FindClusters(so_dia)
+
+so_dev <- NormalizeData(so_dev)
+so_dev <- FindVariableFeatures(so_dev)
+so_dev <- ScaleData(so_dev)
+so_dev <- RunPCA(so_dev)
+so_dev <- RunUMAP(so_dev, dims = 1:30)
+so_dev <- FindNeighbors(so_dev, dims = 1:30)
+so_dev <- FindClusters(so_dev)
+```
+
+```{r}
+DimPlot(so_dia, reduction = "umap")
+DimPlot(so_dev, reduction = "umap")
+
+```
+
+Find Marker Genes
+
+```{r}
+dia_markers <- FindAllMarkers(so_dia)
+dev_markers <- FindAllMarkers(so_dev)
+```
+
+```{r}
+# Filter out genes starting with "KEG"
+dev_top <- dev_markers %>%
+  filter(!startsWith(gene, "KEG")) %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 10) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+dia_top <- dia_markers %>%
+  filter(!startsWith(gene, "KEG")) %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 10) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+```
+
+```{r}
+write.csv(dev_markers, paste0(outs_dir, "/dev_markers_new.csv"))
+write.csv(dia_markers, paste0(outs_dir, "/dia_markers_new.csv"))
+write.csv(dev_top, paste0(outs_dir, "/dev_top_markers_new.csv"))
+write.csv(dia_top, paste0(outs_dir, "/dia_top_markers_new.csv"))
+```
+
+## Annotate After Integration
+
+Split by dev/dia
+
+```{r}
+DefaultAssay(so_singlets) <- "RNA"
+
+so_singlets_split <- split(so_singlets, f = so_singlets$orig.ident)
+
+
+so_singlets_split
+```
+
+Perform Processing on each layer
+
+```{r}
+DefaultAssay(so_singlets_split) <- "RNA"
+
+so_singlets_split <- NormalizeData(so_singlets_split)
+so_singlets_split <- FindVariableFeatures(so_singlets_split)
+so_singlets_split <- ScaleData(so_singlets_split)
+so_singlets_split <- RunPCA(so_singlets_split)
+so_singlets_split <- FindNeighbors(so_singlets_split, dims = 1:30, reduction = "pca")
+so_singlets_split <- RunUMAP(so_singlets_split, dims = 1:30)
+
+DimPlot(so_singlets_split, reduction = "umap", group.by = "orig.ident")
+```
+
+Integrate using CCA
+
+```{r}
+so_singlets_split <- IntegrateLayers(
+  object = so_singlets_split, method = CCAIntegration,
+  orig.reduction = "pca", new.reduction = "integrated.cca",
+  verbose = FALSE
+)
+```
+
+Cluster after Integration
+
+```{r}
+so_singlets_split <- FindNeighbors(so_singlets_split, reduction = "integrated.cca", dims = 1:30)
+so_singlets_split <- RunUMAP(so_singlets_split, reduction = "integrated.cca", dims = 1:30, reduction.name = "umap.cca")
+
+so_singlets_split <- FindClusters(so_singlets_split, cluster.name = "cca_clusters", resolution = 0.3)
+```
+
+```{r}
+
+DimPlot(
+  so_singlets_split,
+  reduction = "umap.cca",
+  group.by = c("orig.ident", "cca_clusters"),
+  combine = FALSE, label.size = 2
+)
+
+
+DimPlot(so_singlets_split, reduction = "umap.cca", split.by = "orig.ident")
+
+DimPlot(so_singlets_split, reduction = "umap.cca", label = T)
+```
+
+```{r}
+table(so_singlets_split$cca_clusters, so_singlets_split$orig.ident)
+```
+
+Join Layers
+
+```{r}
+so_integrated <- JoinLayers(so_singlets_split)
+```
+
+Find and Save All Conserved Markers
+
+```{r}
+#for clusters that are shared between dia and dev
+
+Idents(so_integrated) <- "cca_clusters"
+
+all_conserved_markers <- data.frame()
+
+#clusters 0-14 for mzm
+#clusters 0-13 for grz
+for (i in levels(so_integrated)[1:14]){
+  markers <- FindConservedMarkers(so_integrated,
+                                  ident.1 = i,
+                                  grouping.var = "orig.ident",
+                                  verbose = F)  
+  markers$ident <- i
+  markers$gene <- rownames(markers)
+  rownames(markers) <- 1:nrow(markers)
+  all_conserved_markers <- rbind(all_conserved_markers, markers)
+  print(paste(i, "done"))
+}
+```
+
+```{r}
+write.csv(all_conserved_markers, paste0(outs_dir, "/conserved_markers_new.csv"))
+
+```
+
+```{r}
+#for development specific clusters
+
+markers.14 <- FindMarkers(so_integrated,
+                         ident.1 = "14")
+markers.14$ident <- "14"
+markers.14$gene <- rownames(markers.14)
+rownames(markers.14) <- 1:nrow(markers.14)
+
+
+markers.15 <- FindMarkers(so_integrated,
+                         ident.1 = "15")
+markers.15$ident <- "15"
+markers.15$gene <- rownames(markers.15)
+rownames(markers.15) <- 1:nrow(markers.15)
+
+
+dev_specific_markers <- rbind(markers.14, markers.15)
+```
+
+```{r}
+write.csv(dev_specific_markers, paste0(outs_dir, "/dev_specific_markers_new.csv"))
+
+```
+
+Annotate Clusters
+
+```{r}
+# #MZM Genome
+# cluster.ids <- c("neuron progenitor",	"mature neuron",
+#                 "spinal cord",	"somite",	"midbrain/hindbrain",
+#                 "telencephalon/optic cup",	"epidermal",	"blood",
+#                 "myotome/muscle",	"hatching gland",	"otic vesicle",
+#                 "endothelial",	"pigment cell",	"sema3c neuron",
+#                 "notochord",	"periderm",	"lens")
+
+# #GRZ Genome
+cluster.ids <- c("neuroblast",	"somite",	"spinal cord/neural tube",	"mature neuron",
+                 "telencephalon/optic cup", "neural progenitor",	"epidermal", "midbrain/hindbrain",
+                 "hatching gland","otic vesicle", "blood",	"endothelial",	"pigment cell",
+                 "myotome/muscle","notochord", "lens")
+
+names(cluster.ids) <- levels(so_integrated)
+so_integrated <- RenameIdents(so_integrated, cluster.ids)
+
+DimPlot(so_integrated, reduction = "umap", label = TRUE,
+        pt.size = 0.5, split.by = "devtraj")
+
+DimPlot(so_integrated, reduction = "umap.cca", label = TRUE,
+        pt.size = 0.5, split.by = "devtraj")
+```
+
+```{r}
+so_integrated$annotations <- Idents(so_integrated)
+
+table(so_integrated$annotations, so_integrated$devtraj)
+```
+
+```{r}
+saveRDS(so_integrated, paste0(outs_dir, "/so_annotated.rds"))
+```
+
+```{r}
+sessionInfo()
+```
+
+## Neuronal Subclustering
+
+```{r}
+so_neurons <- subset(
+  x = so_integrated,
+  annotations %in% c("neuron progenitor", "mature neuron", "spinal cord",
+                     "midbrain/hindbrain", "telencephalon/optic cup", 
+                     "sema3c neuron")
+)
+
+
+
+DimPlot(so_neurons, reduction = "umap.cca")
+```
+
+```{r}
+
+so_neurons <- RunUMAP(so_neurons, reduction = "integrated.cca", dims = 1:30, reduction.name = "umap.cca.neuron")
+DimPlot(so_neurons, reduction = "umap.cca.neuron", split.by = "devtraj")
+
+so_neurons <- FindNeighbors(so_neurons, reduction = "integrated.cca", dims = 1:30)
+so_neurons <- FindClusters(so_neurons, cluster.name = "neuron_subclust")
+
+DimPlot(so_neurons, reduction = "umap.cca.neuron")
+
+FeaturePlot(so_neurons, features = neural_crest[1], reduction = "umap.cca.neuron")
+
+table(so_neurons$neuron_subclust, so_neurons$orig.ident)
+  
+```
+
+```{r}
+all_conserved_neuron_markers <- data.frame()
+
+for (i in levels(so_neurons)){
+  markers <- FindConservedMarkers(so_neurons,
+                                  ident.1 = i,
+                                  grouping.var = "devtraj",
+                                  verbose = F)  
+  markers$ident <- i
+  markers$gene <- rownames(markers)
+  rownames(markers) <- 1:nrow(markers)
+  all_conserved_neuron_markers <- rbind(all_conserved_neuron_markers, markers)
+  print(paste(i, "done"))
+}
+
+write.csv(all_conserved_neuron_markers, "../results/conserved_neuron_markers.csv")
+```
