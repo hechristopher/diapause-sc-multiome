@@ -38,16 +38,29 @@ translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final 
   translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
   return(translated[[to]])
 }
+
+SaveFigure <- function(plots, path, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(path, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(path, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
 ```
 
 ## Load Seurat File
 
 ```{r}
-outs_dir <- "../results_all"
+outs_dir <- "../results_all/"
 ```
 
 ```{r}
-so_filtered <- readRDS(paste0(outs_dir, "/so_final_filtered.rds"))
+so_filtered <- readRDS(paste0(outs_dir, "so_final_filtered.rds"))
 ```
 
 ## Find Marker Genes
@@ -62,6 +75,11 @@ so_dev <- subset(so_filtered, timepoint == "dev1d")
 so_earlydia <- subset(so_filtered, timepoint == "dia1d" | timepoint == "dia2d")
 
 so_latedia <- subset(so_filtered,  timepoint == "dia6d")
+
+saveRDS(so_predia, paste0(outs_dir, "so_predia.rds"))
+saveRDS(so_dev, paste0(outs_dir, "so_dev.rds"))
+saveRDS(so_earlydia, paste0(outs_dir, "so_earlydia.rds"))
+saveRDS(so_latedia, paste0(outs_dir, "so_latedia.rds"))
 ```
 
 ```{r}
@@ -73,13 +91,21 @@ so_latedia <- runSeuratRNAProcessing(so_latedia)
 ```
 
 ```{r}
-DimPlot(so_predia)
-DimPlot(so_dev)
-DimPlot(so_earlydia)
-DimPlot(so_latedia)
+p <- DimPlot(so_predia)
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_clusters"),
+           height = 6, width = 6)
 
+p <- DimPlot(so_dev)
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_clusters"),
+           height = 6, width = 6)
 
-FeaturePlot(so_predia, "lfng")
+p <- DimPlot(so_earlydia)
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_clusters"),
+           height = 6, width = 6)
+
+p <- DimPlot(so_latedia)
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_clusters"),
+           height = 6, width = 6)
 ```
 
 ```{r}
@@ -88,24 +114,89 @@ all_markers_predia <- FindAllMarkers(so_predia)
 all_markers_dev <- FindAllMarkers(so_dev)
 all_markers_earlydia <- FindAllMarkers(so_earlydia)
 all_markers_latedia <- FindAllMarkers(so_latedia)
+```
 
-
-#translate from NCBI annotation to our annotation
+```{r}
+#translate from NCBI annotation to our annotation and save
 all_markers_predia$gene_name <- translate(all_markers_predia$gene)
-all_markers_dev$gene_name <- translate(all_markers_dev$gene)
-all_markers_earlydia$gene_name <- translate(all_markers_earlydia$gene)
-all_markers_latedia$gene_name <- translate(all_markers_latedia$gene)
+all_markers_predia$gene <- paste0(all_markers_predia$gene,
+                                  " (", all_markers_predia$gene_name, ")")
 
-top_markers <- all_markers_predia %>%
+all_markers_dev$gene_name <- translate(all_markers_dev$gene)
+all_markers_dev$gene <- paste0(all_markers_dev$gene,
+                                  " (", all_markers_dev$gene_name, ")")
+
+all_markers_earlydia$gene_name <- translate(all_markers_earlydia$gene)
+all_markers_earlydia$gene <- paste0(all_markers_earlydia$gene,
+                                  " (", all_markers_earlydia$gene_name, ")")
+
+all_markers_latedia$gene_name <- translate(all_markers_latedia$gene)
+all_markers_latedia$gene <- paste0(all_markers_latedia$gene,
+                                  " (", all_markers_latedia$gene_name, ")")
+
+write.csv(all_markers_predia,
+          paste0(outs_dir, "markers_predia/all_markers_predia.csv"))
+write.csv(all_markers_dev,
+          paste0(outs_dir, "markers_dev/all_markers_dev.csv"))
+write.csv(all_markers_earlydia,
+          paste0(outs_dir, "markers_earlydia/all_markers_earlydia.csv"))
+write.csv(all_markers_latedia,
+          paste0(outs_dir, "markers_latedia/all_markers_latedia.csv"))
+
+```
+
+```{r}
+#format top 20 markers from each cluster for each group
+top_markers_predia <- all_markers_predia %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
   slice_head(n = 20) %>%
   mutate(rank = row_number()) %>%
-  select(cluster, rank, gene_name) %>%
-  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
   arrange(rank) %>%
   select(-rank)
 
+top_markers_dev <- all_markers_dev %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+top_markers_earlydia <- all_markers_earlydia %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+
+top_markers_latedia <- all_markers_latedia %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+
+write.csv(top_markers_predia,
+          paste0(outs_dir, "markers_predia/top_markers_predia.csv"))
+write.csv(top_markers_dev,
+          paste0(outs_dir, "markers_dev/top_markers_dev.csv"))
+write.csv(top_markers_earlydia,
+          paste0(outs_dir, "markers_earlydia/top_markers_earlydia.csv"))
+write.csv(top_markers_latedia,
+          paste0(outs_dir, "markers_latedia/top_markers_latedia.csv"))
 ```
 
 ```{r}
