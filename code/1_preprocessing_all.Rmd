@@ -776,6 +776,8 @@ saveRDS(so_filtered_medium, paste0(outs_dir, "so_filtered_medium.rds"))
 saveRDS(so_filtered_lenient, paste0(outs_dir, "so_filtered_lenient.rds"))
 ```
 
+## Plotting
+
 ```{r}
 runSeuratRNAProcessing <- function(so){
   DefaultAssay(so) <- "RNA"
@@ -793,8 +795,6 @@ runSeuratRNAProcessing <- function(so){
 ```{r}
 so_unfiltered <- runSeuratRNAProcessing(so_unfiltered)
 ```
-
-## Plotting
 
 ```{r}
 p_devtraj <- DimPlot(so_unfiltered, group.by = "devtraj",
@@ -848,6 +848,8 @@ p <- DimPlot(pseudo, reduction = "pca",
 
 SaveFigure(p, "psuedobulk_PCA", width = 5, height = 3)
 ```
+
+<https://github.com/dpcook/code_snippets/blob/main/20210511_umap_sample_density/umap_sample_density.md>
 
 ```{r}
 dat <- data.frame(so_filtered_medium@meta.data)
@@ -944,6 +946,46 @@ p3 <- DimPlot(so_1d_hb, group.by = "orig.ident", cols = c("#FBA91A", "#FBA91A", 
 
 p <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
 SaveFigure(p, name = "umaps_bysample_combination", width = 15, height = 5)
+```
+
+Make UMAPs for all possible combinations of timepoints
+
+```{r}
+meta <- so_filtered_medium@meta.data
+
+meta <- meta %>% separate_wider_delim(orig.ident, delim = "_",
+                                      names = c("timepoint", "replicate"), cols_remove = F)
+
+
+so_filtered_medium$timepoint <- factor(meta$timepoint, levels = c("hb", "dev1d", "dia1d", "dia2d", "dia6d"))
+```
+
+```{r}
+timepoints = unique(so_filtered_medium$timepoint)
+colors = c("hb" = "#800080", "dev1d" = "#FBA91A", "dia1d" = "#A8D5BA", "dia2d" = "#3E8E7E", "dia6d" = "#23583A")
+
+for(i in 3:5){
+  for(set in combn(timepoints, i, simplify = F)){
+    print(set)
+    so_subset <- subset(so_filtered_medium,
+                        timepoint %in% c(set))
+    print(nrow(so_subset@meta.data))
+    
+    so_subset <- runSeuratRNAProcessing(so_subset)
+    p <- DimPlot(so_subset, group.by = "timepoint", cols = colors[set]) + ggtitle(paste(set, collapse = " + "))
+    SaveFigure(p, paste0("comb_umap_", paste(set, collapse = "_")), width = 7, height = 7)
+  }
+}
+```
+
+```{r}
+saveRDS(so_filtered_medium, paste0(outs_dir, "so_filtered_medium.rds"))
+
+# so_filtered_medium <- readRDS(paste0(outs_dir, "so_filtered_medium.rds"))
+```
+
+```{r}
+saveRDS(so_filtered, paste0(outs_dir, "/so_final_filtered.rds"))
 ```
 
 ```{r}

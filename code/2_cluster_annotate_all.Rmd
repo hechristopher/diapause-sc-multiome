@@ -11,16 +11,118 @@ library(Seurat)
 library(Signac)
 library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
 library(tidyverse)
+library(readxl)
+```
+
+## Helper Functions
+
+```{r}
+runSeuratRNAProcessing <- function(so){
+  DefaultAssay(so) <- "RNA"
+  so <- NormalizeData(so)
+  so <- FindVariableFeatures(so)
+  so <- ScaleData(so)
+  so <- RunPCA(so)
+  so <- RunUMAP(so, dims = 1:30)
+  so <- FindNeighbors(so, dims = 1:30)
+  so <- FindClusters(so)
+  return(so)
+}
+
+#translate from NCBI annotation to our annotation/an ortholog
+translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
+  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
+  row.names(orthos) <- orthos[[from]]
+  translated <- orthos[genes,]
+  translated$genes <- genes
+  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
+  return(translated[[to]])
+}
 ```
 
 ## Load Seurat File
 
 ```{r}
-outs_dir <- "../results_nov24"
+outs_dir <- "../results_all"
 ```
 
 ```{r}
 so_filtered <- readRDS(paste0(outs_dir, "/so_final_filtered.rds"))
+```
+
+## Find Marker Genes
+
+```{r}
+#split into 4 groups: pre-dia (25som, hb), dev(dev1d), and early dia (dia1d, dia2d), and late dia (dia6d, dia1mo, dia3mo)
+
+so_predia <- subset(so_filtered, timepoint == "hb")
+
+so_dev <- subset(so_filtered, timepoint == "dev1d")
+
+so_earlydia <- subset(so_filtered, timepoint == "dia1d" | timepoint == "dia2d")
+
+so_latedia <- subset(so_filtered,  timepoint == "dia6d")
+```
+
+```{r}
+#seurat processing for all 3 groups
+so_predia <- runSeuratRNAProcessing(so_predia)
+so_dev <- runSeuratRNAProcessing(so_dev)
+so_earlydia <- runSeuratRNAProcessing(so_earlydia)
+so_latedia <- runSeuratRNAProcessing(so_latedia)
+```
+
+```{r}
+DimPlot(so_predia)
+DimPlot(so_dev)
+DimPlot(so_earlydia)
+DimPlot(so_latedia)
+
+
+FeaturePlot(so_predia, "lfng")
+```
+
+```{r}
+#find markers for all 3 groups
+all_markers_predia <- FindAllMarkers(so_predia)
+all_markers_dev <- FindAllMarkers(so_dev)
+all_markers_earlydia <- FindAllMarkers(so_earlydia)
+all_markers_latedia <- FindAllMarkers(so_latedia)
+
+
+#translate from NCBI annotation to our annotation
+all_markers_predia$gene_name <- translate(all_markers_predia$gene)
+all_markers_dev$gene_name <- translate(all_markers_dev$gene)
+all_markers_earlydia$gene_name <- translate(all_markers_earlydia$gene)
+all_markers_latedia$gene_name <- translate(all_markers_latedia$gene)
+
+top_markers <- all_markers_predia %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+```
+
+```{r}
+all_markers <- FindAllMarkers(so_filtered)
+
+top_markers <- all_markers %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 10) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+write.csv(all_markers, paste0(outs_dir, "/all_markers"))
+write.csv(top_markers, paste0(outs_dir, "/top_markers"))
 ```
 
 ## Standard Seurat Workflow
