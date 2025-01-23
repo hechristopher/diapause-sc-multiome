@@ -93,10 +93,22 @@ so_earlydia <- subset(so_filtered, timepoint_group == "earlydia")
 so_middia <- subset(so_filtered,  timepoint_group == "middia")
 so_latedia <- subset(so_filtered, timepoint_group == "latedia")
 
+<<<<<<< HEAD
 saveRDS(so_predia, paste0(outs_dir, "markers_predia/so_predia.rds"))
 saveRDS(so_dev, paste0(outs_dir, "markers_dev/so_dev.rds"))
 saveRDS(so_earlydia, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
 saveRDS(so_middia, paste0(outs_dir, "markers_middia/so_middia.rds"))
+=======
+so_dev <- subset(so_filtered, timepoint == "dev1d")
+
+so_earlydia <- subset(so_filtered, timepoint == "dia1d" | timepoint == "dia2d")
+
+so_latedia <- subset(so_filtered,  timepoint == "dia6d")
+
+saveRDS(so_predia, paste0(outs_dir, "markers_predia/so_predia.rds"))
+saveRDS(so_dev, paste0(outs_dir, "markers_dev/so_dev.rds"))
+saveRDS(so_earlydia, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 saveRDS(so_latedia, paste0(outs_dir, "markers_latedia/so_latedia.rds"))
 ```
 
@@ -116,23 +128,39 @@ so_latedia <- runSeuratRNAProcessing(so_latedia)
 ### umap by cluster
 
 ```{r}
+<<<<<<< HEAD
 p <- DimPlot(so_predia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
+=======
+p <- DimPlot(so_predia, label = T)
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_clusters"),
            height = 10, width = 10)
 
+<<<<<<< HEAD
 p <- DimPlot(so_dev, reduction = "umap", label = T, pt.size = 1) + NoLegend()
+=======
+p <- DimPlot(so_dev, label = T)
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_clusters"),
            height = 10, width = 10)
 
+<<<<<<< HEAD
 p <- DimPlot(so_earlydia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
+=======
+p <- DimPlot(so_earlydia, label = T)
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_clusters"),
            height = 10, width = 10)
 
+<<<<<<< HEAD
 p <- DimPlot(so_middia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_clusters"),
            height = 10, width = 10)
 
 p <- DimPlot(so_latedia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
+=======
+p <- DimPlot(so_latedia, label = T)
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_clusters"),
            height = 10, width = 10)
 ```
@@ -284,7 +312,12 @@ top_markers_earlydia <- all_markers_earlydia %>%
   arrange(rank) %>%
   select(-rank)
 
+<<<<<<< HEAD
 top_markers_middia <- all_markers_middia %>%
+=======
+
+top_markers_latedia <- all_markers_latedia %>%
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
   filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
@@ -319,7 +352,201 @@ write.csv(top_markers_latedia,
           paste0(outs_dir, "markers_latedia/top_markers_latedia.csv"))
 ```
 
+<<<<<<< HEAD
 ## Name clusters
+=======
+```{r}
+cluster.ids <- c("neuroblast",
+                 "spinal_cord",
+                 "somite1",
+                 "telencephalon/optic_cup",
+                 'somite2',
+                 'hindbrain',
+                 'epidermal',
+                 'neural_progenitor',
+                 'midbrain-hindbrain_boundary1',
+                 'dividing_neuron',
+                 'heart',
+                 'hatching_gland',
+                 'pronephros',
+                 'endothelial',
+                 'otic_vesicle',
+                 'blood_progenitor',
+                 'myotome/muscle',
+                 'midbrain-hindbrain_boundary2',
+                 'neuron')
+
+names(cluster.ids) <- levels(so_predia)
+so_predia_named <- RenameIdents(so_predia, cluster.ids)
+
+
+p <- DimPlot(so_predia_named, label = T, repel = T) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_annotated"),
+           height = 6, width = 6)
+
+```
+
+```{r}
+cluster.ids <- c('neuroblast1',
+                 'neuroblast2',
+                 'telencephalon/optic_cup',
+                 'somite1',
+                 'spinal_cord',
+                 'neural_progenitor',
+                 's_neuron',
+                 'somite2',
+                 'epidermal1',
+                 'midbrain-hindbrain_boundary1',
+                 'hatching_gland',
+                 'g2/m_neuron',
+                 'endothelial',
+                 'head_kidney',
+                 'epidermal2',
+                 'blood',
+                 'myotome/muscle',
+                 'neuron',
+                 'otic vesicle',
+                 'neuron',
+                 'pigment_cell',
+                 'fin_bud',
+                 'heart'
+)
+
+names(cluster.ids) <- levels(so_earlydia)
+so_earlydia_named <- RenameIdents(so_earlydia, cluster.ids)
+
+
+p <- DimPlot(so_earlydia_named, label = T, repel = T) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_annotated"),
+           height = 6, width = 6)
+```
+
+```{r}
+cluster.ids <- c('neuroblast',
+                 'high_mito_neuron',
+                 'low_mito_neuron',
+                 'spinal_cord',
+                 'somite1',
+                 'neuron',
+                 'telencephalon/optic_cup',
+                 'otic_vesicle',
+                 'hatching_gland',
+                 'epidermal1',
+                 '?lateral_line',
+                 'hindbrain',
+                 'midbrain-hindbrain_boundary',
+                 'endothelial',
+                 'blood',
+                 'unknown_neural',
+                 'myotome/muscle',
+                 'unknown_neural?',
+                 'neuron',
+                 '?EVL',
+                 'epidermal2')
+
+names(cluster.ids) <- levels(so_latedia)
+so_latedia_named <- RenameIdents(so_latedia, cluster.ids)
+
+
+p <- DimPlot(so_latedia_named, label = T, repel = T) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_annotated"),
+           height = 6, width = 6)
+```
+
+```{r}
+cluster.ids <- c("somite",
+                 "neuroblast1",
+                 "neuroblast2",
+                 "spinal_cord",
+                 "neuron1",
+                 "optic_cup",
+                 "neural_progenitor",
+                 "epidermal1",
+                 "telencephalon",
+                 "myotome",
+                 "floor_plate_neural_tube",
+                 "midbrain/hindbrain_boundary1",
+                 "epidermal2",
+                 "head_kidney",
+                 "otic_vesicle",
+                 'endothelial',
+                 'midbrain/hindbrain_boundary2',
+                 "hatching_gland",
+                 "?unknown?",
+                 "pigment_cell",
+                 "neuron2_trigeminal_ganglion?",
+                 "blood",
+                 "neuron_3",
+                 "neuron_4",
+                 "notochord",
+                 "periderm")
+
+names(cluster.ids) <- levels(so_dev)
+so_dev_named <- RenameIdents(so_dev, cluster.ids)
+
+
+p <- DimPlot(so_dev_named, label = T, repel = T) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_annotated"),
+           height = 6, width = 6)
+```
+
+```{r}
+s.genes <- translate(cc.genes$s.genes, from = "Human", to = "N. furzeri (NCBI)")
+g2m.genes <- translate(cc.genes$g2m.genes, from = "Human", to = "N. furzeri (NCBI)")
+
+so_dev_named <- CellCycleScoring(so_dev_named, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+
+so_latedia_named <- CellCycleScoring(so_late_dia_named, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+
+so_earlydia <- CellCycleScoring(so_earlydia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+
+so_predia <- CellCycleScoring(so_predia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+
+
+
+p <- DimPlot(so_dev_named, group.by = "Phase")
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_cellcycle"),
+           height = 6, width = 6)
+p <- DimPlot(so_latedia_named, group.by = "Phase")
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_cellcycle"),
+           height = 6, width = 6)
+p <- DimPlot(so_earlydia_named, group.by = "Phase")
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_cellcycle"),
+           height = 6, width = 6)
+p <- DimPlot(so_predia_named, group.by = "Phase")
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_cellcycle"),
+           height = 6, width = 6)
+```
+
+```{r}
+FeaturePlot(so_earlydia, "LOC107378920")
+```
+
+```{r}
+all_markers <- FindAllMarkers(so_filtered)
+
+top_markers <- all_markers %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 10) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene) %>%
+  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+write.csv(all_markers, paste0(outs_dir, "/all_markers"))
+write.csv(top_markers, paste0(outs_dir, "/top_markers"))
+```
+
+## Standard Seurat Workflow
+
+select doublets to remove
+>>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 
 ```{r}
 #predia
