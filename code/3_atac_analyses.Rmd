@@ -1,0 +1,349 @@
+---
+title: "3_atac_analyses"
+format: html
+editor: visual
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(readxl)
+})
+```
+
+# Helper Functions
+
+```{r}
+SaveFigure <- function(plots, path, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(path, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(path, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
+```
+
+## Set Output Directory
+
+```{r}
+outs_dir <- "../results_all/"
+```
+
+## Import annotated seurat object
+
+```{r}
+so_annotated <- readRDS(paste0(outs_dir, "/so_annotated.rds"))
+```
+
+## Seurat Processing
+
+```{r}
+DefaultAssay(so_annotated) <- "ATAC"
+so_annotated <- FindTopFeatures(so_annotated, min.cutoff = 5)
+so_annotated <- RunTFIDF(so_annotated)
+so_annotated <- RunSVD(so_annotated)
+
+DepthCor(so_annotated)
+
+so_annotated <- RunUMAP(object = so_annotated,
+                        reduction = 'lsi', dims = 2:30,
+                        reduction.name = "umap_ATAC")
+so_annotated <- FindNeighbors(object = so_annotated,
+                              reduction = 'lsi', dims = 2:30)
+so_annotated <- FindClusters(object = so_annotated,
+                             verbose = FALSE, algorithm = 3)
+
+DimPlot(object = so_annotated, reduction = "umap_ATAC", label = TRUE) + NoLegend()
+```
+
+# Gene Activity Score
+
+```{r}
+DefaultAssay(so_annotated) <- 'ATAC'
+
+gene.activities <- GeneActivity(so_annotated, gene.id = T)
+
+so_annotated[['gene_activity']] <- CreateAssayObject(counts = gene.activities)
+
+so_annotated <- NormalizeData(
+  object = so_annotated,
+  assay = 'gene_activity',
+  normalization.method = 'LogNormalize',
+  scale.factor = median(so_annotated$nCount_gene_activity)
+)
+saveRDS(so_annotated, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+```
+
+# Region Stats
+
+```{r}
+DefaultAssay(so_annotated) <- "ATAC"
+
+# first compute the GC content for each peak
+so_annotated <- RegionStats(so_annotated,
+                            genome = BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+
+so_annotated@assays$ATAC@meta.features
+```
+
+# Link Peaks
+
+```{r}
+so_annotated <- LinkPeaks(
+  object = so_annotated,
+  peak.assay = "ATAC",
+  expression.assay = "RNA",
+)
+saveRDS(so_annotated, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+```
+
+# Add Motif information
+
+```{r}
+library(JASPAR2020)
+library(TFBSTools)
+#NOTE: Loading TFBSTools will break seurat functions, so R needs to be reloaded without TFBSTools for downstream steps
+library(patchwork)
+
+pfm <- getMatrixSet(
+  x = JASPAR2020,
+  opts = list(collection = "CORE", tax_group = 'vertebrates', all_versions = FALSE)
+)
+
+# add motif information
+so_annotated <- AddMotifs(
+  object = so_annotated,
+  genome = BSgenome.Nfurzeri.NCBI.Nfu20140520.custom,
+  pfm = pfm
+)
+saveRDS(so_annotated, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+
+library(BiocParallel)
+register(SerialParam())
+
+# add motif activity score using ChromVar
+so_annotated <- RunChromVAR(
+  object = so_annotated,
+  genome = BSgenome.Nfurzeri.NCBI.Nfu20140520.custom
+)
+```
+
+```{r}
+saveRDS(so_annotated, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+
+so_annotated <- readRDS(paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+```
+
+# Linkage Heatmap
+
+```{r}
+library(ComplexHeatmap)
+library(circlize) # for generating colors using colorramp2
+
+so_annotated$devtraj <- factor(so_annotated$devtraj, levels = c("pre-dia", "dev", "dia"))
+
+diadev <- c("dev", "dev", "dev", "dia", "dia", "dia", "dia", "dia", "dia", "dev", "dev", "dev")
+so_annotated$diadev <- diadev[as.numeric(str_split_i(rownames(so_annotated@meta.data), "-",2))]
+so_annotated$diadev <- factor(so_annotated$diadev, levels = c("dev", "dia"))
+
+
+DefaultAssay(so_annotated) <- "RNA"
+Idents(so_annotated) <- "annotation_broad"
+de_genes <- FindAllMarkers(so_annotated, only.pos = T, logfc.threshold = 0.1)
+
+Idents(so_annotated) <- "diadev"
+de_dia <- FindAllMarkers(so_annotated, only.pos = T, logfc.threshold = 0.1, ) %>%
+  filter(p_val_adj < 0.05)
+
+link <- Links(so_annotated[["ATAC"]])
+link <- data.frame(link)
+
+link$gene_cluster <- de_genes[match(link$gene,de_genes$gene),'cluster']
+link$gene_dia_dev <- de_dia[match(link$gene,de_dia$gene),'cluster']
+
+
+link$gene_dia_dev <- as.character(link$gene_dia_dev)
+link$gene_cluster <- as.character(link$gene_cluster)
+link$gene_dia_dev[is.na(link$gene_dia_dev)] <- link$gene_cluster[is.na(link$gene_dia_dev)]
+link$gene_dia_dev[is.na(link$gene_dia_dev)] <- "other"
+link$gene_dia_dev <- factor(link$gene_dia_dev, levels = c("dev", "dia",
+                                                          levels(so_annotated$annotation_broad)))
+link <- arrange(link, gene_dia_dev)
+
+
+split_by_dia_dev <- split(colnames(so_annotated), so_annotated$diadev) 
+split <- lapply(split_by_dia_dev, function(barcodes) {
+  split(barcodes, so_annotated$annotation_broad[match(barcodes, colnames(so_annotated))])
+})
+
+
+colors = palette36.colors(28)
+colors <- sortByHue(colors)
+names(colors) <- levels(so_annotated$annotation_broad)
+swatch(colors)
+
+saveRDS(colors, paste0(outs_dir, "/colors_annotation_broad"))
+
+
+p <- linkage_heatmap(so_annotated, link$gene, link$peak, unlist(split))
+SaveFigure(p, paste0(outs_dir, "figures/linkage_heatmap"), height = 20, width = 20)
+
+```
+
+```{r}
+z_score_normalize <- function(x) {
+    (x - mean(x)) / sd(x)
+}
+linkage_heatmap <- function(seu, genes, peaks, cells, cluster_rows = F){
+  gene_matrix <- seu[["RNA"]]$data[unique(genes),]
+  gene_matrix <- t(apply(gene_matrix, 1, z_score_normalize))
+  gene_matrix <- gene_matrix[match(genes, rownames(gene_matrix)), match(cells, colnames(gene_matrix))]
+  
+  peak_matrix <- seu[["ATAC"]]$data[unique(peaks),]
+  peak_matrix <- t(apply(peak_matrix, 1, z_score_normalize))
+  peak_matrix <- peak_matrix[match(peaks, rownames(peak_matrix)), match(cells, colnames(peak_matrix))]
+  
+  
+  
+  ha = HeatmapAnnotation(
+      cluster = seu@meta.data[cells, "annotation_broad"],
+      traj = seu@meta.data[cells, "diadev"],
+      col = list(cluster = colors,
+                 traj = c("dev" = "#FD8D3C", "dia" = "#2171B5")),
+      show_annotation_name = F
+    )
+  
+  hg <- Heatmap(gene_matrix,
+        cluster_rows = cluster_rows,
+        cluster_columns = F,
+        show_row_names = F,
+        show_column_names = F,
+        col = colorRamp2(c(-2,0,2), c("forestgreen", "white", "darkorange")),
+        top_annotation = ha,
+        heatmap_legend_param = list(title = "normalized expression", legend_direction = "horizontal")
+        )
+  hp <- Heatmap(peak_matrix,
+        cluster_rows = cluster_rows,
+        cluster_columns = F,
+        show_row_names = F,
+        show_column_names = F,
+        col = colorRamp2(c(-2,0,2), c("blue", "white", "red")),
+        top_annotation = ha,
+        heatmap_legend_param = list(title = "normalized accessibility", legend_direction = "horizontal")
+        )
+  
+  hg + hp
+}
+```
+
+# Peak Master List
+
+Create Peak Master List
+
+```{r}
+DefaultAssay(so_annotated) <- "ATAC"
+all_peaks <- as.data.frame(granges(so_annotated))
+rownames(all_peaks) <- rownames(so_annotated[["ATAC"]])
+
+closest_genes <- ClosestFeature(so_annotated, regions = rownames(all_peaks))
+rownames(closest_genes) <- closest_genes$query_region
+
+all_peaks <- merge(all_peaks, closest_genes[,c("gene_name", "distance")], by = "row.names")
+all_peaks <- data.frame(all_peaks, row.names = 1)
+```
+
+Add Peak-gene linkages
+
+```{r}
+linkages <- as.data.frame(Links(so_annotated))
+linkages$gene <- paste0(linkages$gene, " (z=", formatC(linkages$zscore, format = "fg", digits = 3), " p=", formatC(linkages$pvalue, format = "e", digits = 3), ")")
+
+linkages <- linkages %>% 
+  group_by(peak) %>% 
+  summarize(linked_genes = paste(gene, collapse = ", "), linked_number = n(), .groups = "drop")
+
+linkages <- data.frame(linkages, row.names = 1)
+
+all_peaks <- merge(all_peaks, linkages, by = "row.names", all = T)
+all_peaks <- data.frame(all_peaks, row.names = 1)
+```
+
+Global Dia vs dev
+
+```{r}
+DefaultAssay(so_annotated) <- 'ATAC'
+Idents(so_annotated) <- "diadev"
+da_dia_dev <- FindMarkers(
+  object = so_annotated,
+  ident.1 = "dia",
+  ident.2 = "dev",
+  min.pct = -Inf, logfc.threshold = -Inf, min.cells.feature = 1, min.cells.group = 1
+)
+
+da_dia_dev$dia_vs_dev <- ifelse(da_dia_dev$avg_log2FC > 0, "Dia.up", "Dev.up")
+# da_dia_dev <- da_dia_dev[abs(da_dia_dev$avg_log2FC) > 2 & da_dia_dev$p_val_adj < 0.05,]
+
+all_peaks <- merge(all_peaks, da_dia_dev[c("dia_vs_dev", "avg_log2FC", "pct.1", "pct.2", "p_val_adj")], by = "row.names", all = T)
+all_peaks <- data.frame(all_peaks, row.names = 1)
+
+```
+
+```{r}
+write.csv(all_peaks, paste0(outs_dir, "/master_peaks.csv"), na = "")
+```
+
+## Motif Master List
+
+```{r}
+
+#NOTE: enriched motifs depends on fold change cutoff
+top.da.peak <- rownames(da_dia_dev[da_dia_dev$p_val_adj < 0.05 & da_dia_dev$avg_log2FC > 0.5, ])
+
+enriched.motifs <- FindMotifs(
+  object = so_annotated,
+  features = top.da.peak
+)
+
+MotifPlot(
+  object = so_annotated,
+  motifs = head(rownames(enriched.motifs))
+)
+
+enriched.motifs <- enriched.motifs[,c(8,4,5,6,9)]
+
+colnames(enriched.motifs)[-1] <- paste0("dia vs dev ", colnames(enriched.motifs)[-1])
+```
+
+Differential Motif Activity
+
+```{r}
+Idents(so_annotated) <- "diadev"
+
+diff.motifs <- FindMarkers(
+  assay = "chromvar",
+  object = so_annotated,
+  ident.1 = "dia",
+  ident.2 = "dev"
+)
+
+colnames(diff.motifs) <- paste0("motif_activity_", colnames(diff.motifs))
+diff.motifs$motif_activity_dia_vs_dev <- ifelse(diff.motifs$motif_activity_avg_log2FC > 0, "Dia.up", "Dev.up")
+diff.motifs <- diff.motifs[abs(diff.motifs$motif_activity_avg_log2FC) > 1.5 & diff.motifs$motif_activity_p_val_adj < 0.05, c(6,2,3,4,5)]
+
+
+motif_master <- merge(enriched.motifs, diff.motifs, by = "row.names", all = T)
+rownames(motif_master) <- motif_master$Row.names
+motif_master <- motif_master[,-1]
+```
+
+```{r}
+write.csv(motif_master, paste0(outs_dir, "/master_motifs.csv"), na = "")
+```

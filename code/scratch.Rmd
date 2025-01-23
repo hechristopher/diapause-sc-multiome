@@ -1,0 +1,308 @@
+---
+title: "scratch"
+output: html_notebook
+---
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(readxl)
+  library(scCustomize)
+  library(Polychrome)
+})
+```
+
+```{r}
+#translate from NCBI annotation to our annotation/an ortholog
+translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
+  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
+  
+  orthos <- orthos[!duplicated(orthos[[from]]),]
+  orthos <- orthos[!is.na(orthos[[from]]),]
+  
+  row.names(orthos) <- orthos[[from]]
+  translated <- orthos[genes,]
+  translated$genes <- genes
+  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
+  return(translated[[to]])
+}
+
+SaveFigure <- function(plots, path, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(path, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(path, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
+```
+
+```{r}
+outs_dir <- "../results_scratch/"
+```
+
+
+```{r}
+so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+```
+
+## Figures for Lab Meeting 1/17
+```{r}
+# Pre-Filtering UMAP
+so_unfiltered <- readRDS("../results_all/so_unfiltered.rds")
+
+library(RColorBrewer)
+
+p <- DimPlot(so_unfiltered, group.by = "devtraj", cols = c("#D94801", "#6BAED6" , "#FDD0A2"))
+SaveFigure(p, paste0(outs_dir, "unfiltered_umap_devtraj"), width = 10, height = 10)
+
+p <- DimPlot(so_unfiltered, group.by = "orig.ident",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
+                      "#FD8D3C", "#FD8D3C", "#FD8D3C"))
+SaveFigure(p, paste0(outs_dir, "unfiltered_umap_origident"), width = 10, height = 10)
+
+
+p <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex",
+             cols = c("grey","blue"))
+SaveFigure(p, paste0(outs_dir, "unfiltered_umap_doublets"), width = 10, height = 10)
+
+```
+```{r}
+p <- DimPlot(so_annotated, group.by = "orig.ident",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
+                      "#FD8D3C", "#FD8D3C", "#FD8D3C"), reduction = "umap", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_origident"), width = 10, height = 10)
+
+p <- DimPlot(so_annotated, group.by = "devtraj",
+             cols = c("#FD8D3C",
+                      "#2171B5",
+                      "#800080"), reduction = "umap", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_devtraj"), width = 10, height = 10)
+
+p <- FeaturePlot(so_annotated, features = "nFeature_RNA", max.cutoff = 1000, reduction = "umap")
+SaveFigure(p, paste0(outs_dir, "umap_nFeature_RNA"), width = 10, height = 10)
+
+```
+```{r}
+runSeuratRNAProcessing <- function(so, resolution = 0.8){
+  DefaultAssay(so) <- "RNA"
+  so <- NormalizeData(so)
+  so <- FindVariableFeatures(so)
+  so <- ScaleData(so)
+  so <- RunPCA(so)
+  so <- RunUMAP(so, dims = 1:30)
+  so <- FindNeighbors(so, dims = 1:30)
+  so <- FindClusters(so, resolution = resolution)
+  return(so)
+}
+so_annotated <- readRDS("../results_all/so_annotated.rds")
+
+
+so_predia_dev <- subset(so_annotated, devtraj == "pre-dia" | devtraj == "dev")
+so_predia_dia <- subset(so_annotated, devtraj == "pre-dia" | devtraj == "dia")
+so_dia <- subset(so_annotated, devtraj == "dia")
+
+so_predia_dev <- runSeuratRNAProcessing(so_predia_dev)
+so_predia_dia <- runSeuratRNAProcessing(so_predia_dia)
+so_dia <- runSeuratRNAProcessing(so_dia)
+
+
+p <- DimPlot(so_predia_dev, group.by = "orig.ident",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#FD8D3C", "#FD8D3C", "#FD8D3C"), reduction = "umap", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_predia_dev"), width = 10, height = 10)
+
+p <- DimPlot(so_predia_dia, group.by = "orig.ident",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B"), reduction = "umap", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_predia_dia"), width = 10, height = 10)
+
+p <- DimPlot(so_dia, group.by = "orig.ident",
+             cols = c("#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B"), reduction = "umap", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_dia"), width = 10, height = 10)
+
+```
+```{r}
+so_middia <- readRDS("../results_all/markers_middia/so_middia.rds")
+
+p <- FeaturePlot(so_middia, reduction = "umap", features = "percent.mt")
+SaveFigure(p, paste0(outs_dir, "middia_percent.mt"), width = 5, height = 5)
+
+
+p <- FeaturePlot(so_middia, reduction = "umap", features = "nCount_RNA", max.cutoff = 1000)
+SaveFigure(p, paste0(outs_dir, "middia_nCount_RNA"), width = 5, height = 5)
+
+
+so_latedia <- readRDS("../results_all/markers_latedia/so_latedia.rds")
+
+p <- FeaturePlot(so_latedia, reduction = "umap", features = "percent.mt")
+SaveFigure(p, paste0(outs_dir, "latedia_percent.mt"), width = 5, height = 5)
+
+
+p <- FeaturePlot(so_latedia, reduction = "umap", features = "nCount_RNA", max.cutoff = 1000)
+SaveFigure(p, paste0(outs_dir, "latedia_nCount_RNA"), width = 5, height = 5)
+
+```
+
+```{r}
+so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+
+Idents(so) <- "annotation_broad"
+colors = palette36.colors(28)
+colors <- sortByHue(colors)
+names(colors) <- levels(Idents(so))
+
+DefaultAssay(so) <- "RNA"
+p <- DimPlot(so, reduction = "umap", cols = colors, pt.size = 0.7)
+SaveFigure(p, paste0(outs_dir, "umap_annotated_broad"), height = 10, width = 17)
+
+
+DefaultAssay(so) <- "ATAC"
+p <- DimPlot(so, reduction = "umap_ATAC", cols = colors, pt.size = 0.7)
+SaveFigure(p, paste0(outs_dir, "umap_atac_annotated_broad"), height = 10, width = 17)
+
+DefaultAssay(so) <- "ATAC"
+p <- DimPlot(so, reduction = "umap_ATAC", group.by = "orig.ident",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
+                      "#FD8D3C", "#FD8D3C", "#FD8D3C"), pt.size = 0.3)
+SaveFigure(p, paste0(outs_dir, "umap_atac_origident"), height = 10, width = 10)
+
+
+DefaultAssay(so) <- "ATAC"
+p <- DimPlot(so, reduction = "umap_ATAC", group.by = "devtraj",
+             cols = c("#FD8D3C",
+                      "#2171B5",
+                      "#800080"), pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_atac_devtraj"), width = 10, height = 10)
+
+DefaultAssay(so) <- "ATAC"
+p <- DimPlot(so, reduction = "umap_ATAC", group.by = "ATAC_snn_res.0.8", pt.size = .3)
+SaveFigure(p, paste0(outs_dir, "umap_atac_clusters"), width = 10, height = 10)
+```
+```{r}
+DefaultAssay(so) <- "RNA"
+
+all_dia <- WhichCells(so, expression = devtraj == "dia")
+all_dev <- WhichCells(so, expression = devtraj != "dia")
+
+compute_DE <- function(dia, dev){
+  #compute DE genes
+  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev)
+  
+  #add gene names as row, adding our annotations
+  df$gene <- rownames(df)
+  df$gene_name <- translate(df$gene)
+  df$gene_name <- paste0(df$gene," (", df$gene_name, ")")
+
+  #annotate with dia/dev up
+  df$DE <- NA
+  df$DE[df$avg_log2FC < -2 & df$p_val_adj < 0.05] <- "Dev Up"
+  df$DE[df$avg_log2FC > 2 & df$p_val_adj < 0.05] <- "Dia Up"
+  return(df)
+}
+
+global_diavsdev <- compute_DE(all_dia, all_dev)
+
+
+
+p <- ggplot(global_diavsdev, aes(x = avg_log2FC, y = -log10(p_val_adj), col=DE)) + geom_point() + 
+  theme_minimal() + xlim(-15, 15) +
+  geom_vline(xintercept=c(-2, 2), col="red") +
+  geom_hline(yintercept=-log10(0.05), col="red") + 
+  scale_color_manual(values=c("red", "blue", "black"))
+
+SaveFigure(p, paste0(outs_dir, "volcano_RNA"), width = 4, height = 4)
+
+```
+
+```{r}
+DefaultAssay(so) <- "ATAC"
+
+all_dia <- WhichCells(so, expression = devtraj == "dia")
+all_dev <- WhichCells(so, expression = devtraj != "dia")
+
+global_diavsdev_atac <- FindMarkers(so, ident.1 = all_dia, ident.2 = all_dev)
+
+global_diavsdev_atac$DE <- NA
+global_diavsdev_atac$DE[global_diavsdev_atac$avg_log2FC < -1 & global_diavsdev_atac$p_val_adj < 0.05] <- "Dev Up"
+global_diavsdev_atac$DE[global_diavsdev_atac$avg_log2FC > 1 & global_diavsdev_atac$p_val_adj < 0.05] <- "Dia Up"
+
+
+p <- ggplot(global_diavsdev_atac, aes(x = avg_log2FC, y = -log10(p_val_adj), col=DE)) + geom_point() + 
+  theme_minimal() + xlim(-15, 15) +
+  geom_vline(xintercept=c(-1, 1), col="red") +
+  geom_hline(yintercept=-log10(0.05), col="red") + 
+  scale_color_manual(values=c("red", "blue", "black"))
+
+SaveFigure(p, paste0(outs_dir, "volcano_ATAC"), width = 4, height = 4)
+```
+```{r}
+top.da.peak <- rownames(global_diavsdev_atac %>% filter(DE == "Dia Up"))
+
+enriched.motifs <- FindMotifs(
+  object = so,
+  features = top.da.peak
+)
+
+p <- MotifPlot(
+  object = so,
+  motifs = head(rownames(enriched.motifs))
+)
+
+SaveFigure(p, paste0(outs_dir, "motifs_dia"), width = 6, height = 4)
+
+```
+```{r}
+DefaultAssay(so) <- "RNA"
+
+pseudo <- AggregateExpression(so, assays = "RNA",return.seurat = T, group.by = "orig.ident")
+
+pseudo <- NormalizeData(pseudo)
+pseudo <- FindVariableFeatures(pseudo)
+pseudo <- RunPCA(pseudo, npcs = 7)
+
+
+p <- DimPlot(pseudo, reduction = "pca",
+             cols = c("#E496EF","#800080", "#800080",
+                      "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
+                      "#FD8D3C", "#FD8D3C", "#FD8D3C"),
+             label = T, repel = T, pt.size = 4) + NoLegend()
+
+SaveFigure(p, paste0(outs_dir, "pseudobulk_pca"), width = 5, height = 5)
+```
+```{r}
+DefaultAssay(so) <- "RNA"
+so$devtraj <- factor(so$devtraj, levels = c("pre-dia", "dev", "dia"))
+
+
+so$hatch <- ifelse(so$annotation_broad == "hatching_gland", "hatching_gland", "all others")
+
+
+p <- FeaturePlot(so, reduction = "umap", features = "ppib") + NoLegend() + NoAxes()
+SaveFigure(p, paste0(outs_dir, "ppib_feature"), width = 5, height = 5)
+
+p <- VlnPlot(so, features = "ppib", group.by = "hatch", split.by = "devtraj",
+        cols = c("#E496EF", "#FD8D3C", "#2171B5"), pt.size = 0)
+SaveFigure(p, paste0(outs_dir, "ppib_vln"), width = 5, height = 5)
+
+
+
+so$neuron <- ifelse(so$annotation_broad == "neuron", "neuron", "all others")
+p <- FeaturePlot(so, reduction = "umap", features = "LOC107372894") + NoLegend() + NoAxes()
+SaveFigure(p, paste0(outs_dir, "LOC107372894_feature"), width = 5, height = 5)
+
+p <- VlnPlot(so, features = "LOC107372894", group.by = "neuron", split.by = "devtraj",
+        cols = c("#E496EF", "#FD8D3C", "#2171B5"),y.max = 2, pt.size = 0)
+SaveFigure(p, paste0(outs_dir, "LOC107372894_vln"), width = 5, height = 5)
+
+```
+

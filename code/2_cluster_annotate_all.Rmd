@@ -1,23 +1,26 @@
 ---
 title: "2_cluster_annotate"
 format: html
-editor: visual
 ---
 
 ## Load libraries
 
 ```{r}
-library(Seurat)
-library(Signac)
-library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
-library(tidyverse)
-library(readxl)
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(readxl)
+  library(scCustomize)
+  library(Polychrome)
+})
 ```
 
 ## Helper Functions
 
 ```{r}
-runSeuratRNAProcessing <- function(so){
+runSeuratRNAProcessing <- function(so, resolution = 0.8){
   DefaultAssay(so) <- "RNA"
   so <- NormalizeData(so)
   so <- FindVariableFeatures(so)
@@ -25,13 +28,17 @@ runSeuratRNAProcessing <- function(so){
   so <- RunPCA(so)
   so <- RunUMAP(so, dims = 1:30)
   so <- FindNeighbors(so, dims = 1:30)
-  so <- FindClusters(so)
+  so <- FindClusters(so, resolution = resolution)
   return(so)
 }
 
 #translate from NCBI annotation to our annotation/an ortholog
 translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
   orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
+  
+  orthos <- orthos[!duplicated(orthos[[from]]),]
+  orthos <- orthos[!is.na(orthos[[from]]),]
+  
   row.names(orthos) <- orthos[[from]]
   translated <- orthos[genes,]
   translated$genes <- genes
@@ -63,75 +70,168 @@ outs_dir <- "../results_all/"
 so_filtered <- readRDS(paste0(outs_dir, "so_final_filtered.rds"))
 ```
 
-## Find Marker Genes
+## Split into Annotation groups
+
+split into 5 groups: pre-dia (25som, hb), dev(dev1d), early dia (dia1d, dia2d), mid dia (dia6d), and late dia (dia1mo, dia3mo)
 
 ```{r}
-#split into 4 groups: pre-dia (25som, hb), dev(dev1d), and early dia (dia1d, dia2d), and late dia (dia6d, dia1mo, dia3mo)
+#make meta.data column with annotation group
+Idents(so_filtered) <- "timepoint"
+so_filtered <- RenameIdents(so_filtered, c("hb" = "predia",
+                                           "25som" = "predia",
+                                           "dia1d" = "earlydia",
+                                           "dia2d" = "earlydia",
+                                           "dia6d" = "middia",
+                                           "dia1mo" = "latedia",
+                                           "dia3mo" = "latedia",
+                                           "dev1d" = "dev"))
+so_filtered$timepoint_group <- Idents(so_filtered)
 
-so_predia <- subset(so_filtered, timepoint == "hb")
+so_predia <- subset(so_filtered, timepoint_group == "predia")
+so_dev <- subset(so_filtered, timepoint_group == "dev")
+so_earlydia <- subset(so_filtered, timepoint_group == "earlydia")
+so_middia <- subset(so_filtered,  timepoint_group == "middia")
+so_latedia <- subset(so_filtered, timepoint_group == "latedia")
 
-so_dev <- subset(so_filtered, timepoint == "dev1d")
-
-so_earlydia <- subset(so_filtered, timepoint == "dia1d" | timepoint == "dia2d")
-
-so_latedia <- subset(so_filtered,  timepoint == "dia6d")
-
-saveRDS(so_predia, paste0(outs_dir, "so_predia.rds"))
-saveRDS(so_dev, paste0(outs_dir, "so_dev.rds"))
-saveRDS(so_earlydia, paste0(outs_dir, "so_earlydia.rds"))
-saveRDS(so_latedia, paste0(outs_dir, "so_latedia.rds"))
+saveRDS(so_predia, paste0(outs_dir, "markers_predia/so_predia.rds"))
+saveRDS(so_dev, paste0(outs_dir, "markers_dev/so_dev.rds"))
+saveRDS(so_earlydia, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
+saveRDS(so_middia, paste0(outs_dir, "markers_middia/so_middia.rds"))
+saveRDS(so_latedia, paste0(outs_dir, "markers_latedia/so_latedia.rds"))
 ```
+
+### Save subsets
 
 ```{r}
 #seurat processing for all 3 groups
 so_predia <- runSeuratRNAProcessing(so_predia)
 so_dev <- runSeuratRNAProcessing(so_dev)
 so_earlydia <- runSeuratRNAProcessing(so_earlydia)
+so_middia <- runSeuratRNAProcessing(so_middia, resolution = 0.6)
 so_latedia <- runSeuratRNAProcessing(so_latedia)
 ```
 
+## Pre-Annotation plots
+
+### umap by cluster
+
 ```{r}
-p <- DimPlot(so_predia)
+p <- DimPlot(so_predia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_clusters"),
-           height = 6, width = 6)
+           height = 10, width = 10)
 
-p <- DimPlot(so_dev)
+p <- DimPlot(so_dev, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_clusters"),
-           height = 6, width = 6)
+           height = 10, width = 10)
 
-p <- DimPlot(so_earlydia)
+p <- DimPlot(so_earlydia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_clusters"),
-           height = 6, width = 6)
+           height = 10, width = 10)
 
-p <- DimPlot(so_latedia)
+p <- DimPlot(so_middia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_clusters"),
+           height = 10, width = 10)
+
+p <- DimPlot(so_latedia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_clusters"),
-           height = 6, width = 6)
+           height = 10, width = 10)
 ```
 
+### umap by replicate
+
 ```{r}
-#find markers for all 3 groups
+p <- DimPlot(so_predia, group.by = "orig.ident", reduction = "umap", label = T, pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_orig.ident"),
+           height = 10, width = 10)
+
+p <- DimPlot(so_dev, group.by = "orig.ident", reduction = "umap", label = T, pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_orig.ident"),
+           height = 10, width = 10)
+
+p <- DimPlot(so_earlydia, group.by = "orig.ident", reduction = "umap", label = T, pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_orig.ident"),
+           height = 10, width = 10)
+
+p <- DimPlot(so_middia, group.by = "orig.ident", reduction = "umap", label = T, pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_orig.ident"),
+           height = 10, width = 10)
+
+p <- DimPlot(so_latedia, group.by = "orig.ident", reduction = "umap", label = T, pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_orig.ident"),
+           height = 10, width = 10)
+
+```
+
+### umap by cell cycle phase
+
+requires cell cycle scoring first
+
+```{r}
+#cell cycle scoring
+s.genes <- translate(cc.genes$s.genes, from = "Human", to = "N. furzeri (NCBI)")
+g2m.genes <- translate(cc.genes$g2m.genes, from = "Human", to = "N. furzeri (NCBI)")
+
+so_predia <- CellCycleScoring(so_predia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+so_dev <- CellCycleScoring(so_dev, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+so_earlydia <- CellCycleScoring(so_earlydia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+so_middia <- CellCycleScoring(so_middia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+so_latedia <- CellCycleScoring(so_latedia, s.features = s.genes,
+                                 g2m.features = g2m.genes)
+
+p <- DimPlot(so_predia, reduction = "umap", group.by = "Phase", pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_cellcycle"),
+           height = 10, width = 10)
+p <- DimPlot(so_dev, reduction = "umap", group.by = "Phase", pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_cellcycle"),
+           height = 10, width = 10)
+p <- DimPlot(so_earlydia, reduction = "umap", group.by = "Phase", pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_cellcycle"),
+           height = 10, width = 10)
+p <- DimPlot(so_middia, reduction = "umap", group.by = "Phase", pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_cellcycle"),
+           height = 10, width = 10)
+p <- DimPlot(so_latedia, reduction = "umap", group.by = "Phase", pt.size = 1)
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_cellcycle"),
+           height = 10, width = 10)
+```
+
+## Marker Genes
+
+### find all markers for each annotation gruop
+
+```{r}
+#find markers for all 5 groups
 all_markers_predia <- FindAllMarkers(so_predia)
 all_markers_dev <- FindAllMarkers(so_dev)
 all_markers_earlydia <- FindAllMarkers(so_earlydia)
+all_markers_middia <- FindAllMarkers(so_middia)
 all_markers_latedia <- FindAllMarkers(so_latedia)
 ```
 
 ```{r}
 #translate from NCBI annotation to our annotation and save
 all_markers_predia$gene_name <- translate(all_markers_predia$gene)
-all_markers_predia$gene <- paste0(all_markers_predia$gene,
+all_markers_predia$gene_name <- paste0(all_markers_predia$gene,
                                   " (", all_markers_predia$gene_name, ")")
 
 all_markers_dev$gene_name <- translate(all_markers_dev$gene)
-all_markers_dev$gene <- paste0(all_markers_dev$gene,
+all_markers_dev$gene_name <- paste0(all_markers_dev$gene,
                                   " (", all_markers_dev$gene_name, ")")
 
 all_markers_earlydia$gene_name <- translate(all_markers_earlydia$gene)
-all_markers_earlydia$gene <- paste0(all_markers_earlydia$gene,
+all_markers_earlydia$gene_name <- paste0(all_markers_earlydia$gene,
                                   " (", all_markers_earlydia$gene_name, ")")
 
+all_markers_middia$gene_name <- translate(all_markers_middia$gene)
+all_markers_middia$gene_name <- paste0(all_markers_middia$gene,
+                                  " (", all_markers_middia$gene_name, ")")
+
 all_markers_latedia$gene_name <- translate(all_markers_latedia$gene)
-all_markers_latedia$gene <- paste0(all_markers_latedia$gene,
+all_markers_latedia$gene_name <- paste0(all_markers_latedia$gene,
                                   " (", all_markers_latedia$gene_name, ")")
 
 write.csv(all_markers_predia,
@@ -140,51 +240,69 @@ write.csv(all_markers_dev,
           paste0(outs_dir, "markers_dev/all_markers_dev.csv"))
 write.csv(all_markers_earlydia,
           paste0(outs_dir, "markers_earlydia/all_markers_earlydia.csv"))
+write.csv(all_markers_middia,
+          paste0(outs_dir, "markers_middia/all_markers_middia.csv"))
 write.csv(all_markers_latedia,
           paste0(outs_dir, "markers_latedia/all_markers_latedia.csv"))
 
 ```
 
+### format top 20 markers for each cluster
+
 ```{r}
 #format top 20 markers from each cluster for each group
 top_markers_predia <- all_markers_predia %>%
+  filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
   slice_head(n = 20) %>%
   mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
   arrange(rank) %>%
   select(-rank)
 
 top_markers_dev <- all_markers_dev %>%
+  filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
   slice_head(n = 20) %>%
   mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
   arrange(rank) %>%
   select(-rank)
 
 top_markers_earlydia <- all_markers_earlydia %>%
+  filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
   slice_head(n = 20) %>%
   mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
   arrange(rank) %>%
   select(-rank)
 
-
-top_markers_latedia <- all_markers_latedia %>%
+top_markers_middia <- all_markers_middia %>%
+  filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
   slice_head(n = 20) %>%
   mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+top_markers_latedia <- all_markers_latedia %>%
+  filter(avg_log2FC > 0.5) %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
   arrange(rank) %>%
   select(-rank)
 
@@ -195,366 +313,547 @@ write.csv(top_markers_dev,
           paste0(outs_dir, "markers_dev/top_markers_dev.csv"))
 write.csv(top_markers_earlydia,
           paste0(outs_dir, "markers_earlydia/top_markers_earlydia.csv"))
+write.csv(top_markers_middia,
+          paste0(outs_dir, "markers_middia/top_markers_middia.csv"))
 write.csv(top_markers_latedia,
           paste0(outs_dir, "markers_latedia/top_markers_latedia.csv"))
 ```
 
-```{r}
-all_markers <- FindAllMarkers(so_filtered)
-
-top_markers <- all_markers %>%
-  group_by(cluster) %>%
-  arrange(p_val_adj) %>%
-  slice_head(n = 10) %>%
-  mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
-  arrange(rank) %>%
-  select(-rank)
-
-write.csv(all_markers, paste0(outs_dir, "/all_markers"))
-write.csv(top_markers, paste0(outs_dir, "/top_markers"))
-```
-
-## Standard Seurat Workflow
-
-select doublets to remove
+## Name clusters
 
 ```{r}
-# so_singlets <- subset(
-#     x = so_filtered,
-#     subset =DF.classifications == "Singlet" &
-#     scDblFinder.class.gex == "singlet"  &
-#     scDblFinder.class.atac == "singlet"
-# )
-
-so_singlets <- subset(
-    x = so_filtered,
-    subset =DF.classifications == "Singlet" &
-    scDblFinder.class.gex == "singlet"
+#predia
+cluster.ids <- c(
+  'neuron_progenitor',
+  'spinal_cord',
+  'somite',
+  'myotome/muscle_1',
+  'telencephalon/optic_cup',
+  'dividing_neuron',
+  'epidermal',
+  'head_kidney',
+  'hibernating_unknown',
+  'hatching_gland',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'differentiating_neuron',
+  'endothelial',
+  'periderm',
+  'tail_bud',
+  'neuron',
+  'primitive_gut',
+  'blood_progenitor',
+  'myotome/muscle_2',
+  'otic_vesicle',
+  'pronephros',
+  'fin_bud',
+  'notochord',
+  'neuron_dscam',
+  'midbrain_hindbrain_wnt1/lmx1b'
 )
 
-```
+names(cluster.ids) <- levels(so_predia)
+so_predia_named <- RenameIdents(so_predia, cluster.ids)
 
-normalize, find variable features, pick PCs
 
-```{r}
-DefaultAssay(so_singlets) <- "RNA"
-
-so_singlets <- NormalizeData(so_singlets)
-so_singlets <- FindVariableFeatures(so_singlets)
-so_singlets <- ScaleData(so_singlets)
-so_singlets <- RunPCA(so_singlets)
-ElbowPlot(so_singlets, ndims = 30)
-```
-
-UMAP and cluster
-
-```{r}
-so_singlets <- RunUMAP(so_singlets, dims = 1:30)
-so_singlets <- FindNeighbors(so_singlets, dims = 1:30)
-so_singlets <- FindClusters(so_singlets)
-DimPlot(so_singlets, reduction = "umap")
-DimPlot(so_singlets, reduction = "umap", group.by = "devtraj",
-        cols = c("#FBA91A", "cadetblue1", "cadetblue3", "darkolivegreen1"), label = TRUE)
-
-DimPlot(so_singlets, reduction = "umap", label = TRUE)
-DimPlot(so_singlets, reduction = "umap",  split.by = "devtraj", label = T) + NoLegend()
+p <- DimPlot(so_predia_named, reduction = "umap", label = T, repel = T, pt.size = 1) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_annotated"),
+           height = 10, width = 10)
 
 ```
 
 ```{r}
-table(so_singlets$seurat_clusters, so_singlets$orig.ident)
-
-saveRDS(so_singlets, paste0(outs_dir, "/so_singlets_clustered.rds"))
-```
-
-## Annotate Diapause and Development Separately
-
-Subset dia and dev
-
-```{r}
-so_dia <- subset(so_singlets, subset = devtraj == "Diapause")
-so_dev <- subset(so_singlets, subset = devtraj == "Development")
-```
-
-cluster dia and dev
-
-```{r}
-so_dia <- NormalizeData(so_dia)
-so_dia <- FindVariableFeatures(so_dia)
-so_dia <- ScaleData(so_dia)
-so_dia <- RunPCA(so_dia)
-so_dia <- RunUMAP(so_dia, dims = 1:30)
-so_dia <- FindNeighbors(so_dia, dims = 1:30)
-so_dia <- FindClusters(so_dia)
-
-so_dev <- NormalizeData(so_dev)
-so_dev <- FindVariableFeatures(so_dev)
-so_dev <- ScaleData(so_dev)
-so_dev <- RunPCA(so_dev)
-so_dev <- RunUMAP(so_dev, dims = 1:30)
-so_dev <- FindNeighbors(so_dev, dims = 1:30)
-so_dev <- FindClusters(so_dev)
-```
-
-```{r}
-DimPlot(so_dia, reduction = "umap")
-DimPlot(so_dev, reduction = "umap")
-
-```
-
-Find Marker Genes
-
-```{r}
-dia_markers <- FindAllMarkers(so_dia)
-dev_markers <- FindAllMarkers(so_dev)
-```
-
-```{r}
-# Filter out genes starting with "KEG"
-dev_top <- dev_markers %>%
-  filter(!startsWith(gene, "KEG")) %>%
-  group_by(cluster) %>%
-  arrange(p_val_adj) %>%
-  slice_head(n = 10) %>%
-  mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
-  arrange(rank) %>%
-  select(-rank)
-
-dia_top <- dia_markers %>%
-  filter(!startsWith(gene, "KEG")) %>%
-  group_by(cluster) %>%
-  arrange(p_val_adj) %>%
-  slice_head(n = 10) %>%
-  mutate(rank = row_number()) %>%
-  select(cluster, rank, gene) %>%
-  pivot_wider(names_from = cluster, values_from = gene, names_prefix = "Cluster_", values_fill = list(gene = "")) %>%
-  arrange(rank) %>%
-  select(-rank)
-```
-
-```{r}
-write.csv(dev_markers, paste0(outs_dir, "/dev_markers_new.csv"))
-write.csv(dia_markers, paste0(outs_dir, "/dia_markers_new.csv"))
-write.csv(dev_top, paste0(outs_dir, "/dev_top_markers_new.csv"))
-write.csv(dia_top, paste0(outs_dir, "/dia_top_markers_new.csv"))
-```
-
-## Annotate After Integration
-
-Split by dev/dia
-
-```{r}
-DefaultAssay(so_singlets) <- "RNA"
-
-so_singlets_split <- split(so_singlets, f = so_singlets$orig.ident)
-
-
-so_singlets_split
-```
-
-Perform Processing on each layer
-
-```{r}
-DefaultAssay(so_singlets_split) <- "RNA"
-
-so_singlets_split <- NormalizeData(so_singlets_split)
-so_singlets_split <- FindVariableFeatures(so_singlets_split)
-so_singlets_split <- ScaleData(so_singlets_split)
-so_singlets_split <- RunPCA(so_singlets_split)
-so_singlets_split <- FindNeighbors(so_singlets_split, dims = 1:30, reduction = "pca")
-so_singlets_split <- RunUMAP(so_singlets_split, dims = 1:30)
-
-DimPlot(so_singlets_split, reduction = "umap", group.by = "orig.ident")
-```
-
-Integrate using CCA
-
-```{r}
-so_singlets_split <- IntegrateLayers(
-  object = so_singlets_split, method = CCAIntegration,
-  orig.reduction = "pca", new.reduction = "integrated.cca",
-  verbose = FALSE
-)
-```
-
-Cluster after Integration
-
-```{r}
-so_singlets_split <- FindNeighbors(so_singlets_split, reduction = "integrated.cca", dims = 1:30)
-so_singlets_split <- RunUMAP(so_singlets_split, reduction = "integrated.cca", dims = 1:30, reduction.name = "umap.cca")
-
-so_singlets_split <- FindClusters(so_singlets_split, cluster.name = "cca_clusters", resolution = 0.3)
-```
-
-```{r}
-
-DimPlot(
-  so_singlets_split,
-  reduction = "umap.cca",
-  group.by = c("orig.ident", "cca_clusters"),
-  combine = FALSE, label.size = 2
+#early dia
+cluster.ids <- c(
+  'spinal_cord',
+  'neuron_progenitor',
+  'somite',
+  'telencephalon/optic_cup',
+  'myotome/muscle',
+  'differentiating_neuron',
+  'floor_plate',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'epidermal',
+  'hatching_gland',
+  'endothelial',
+  'head_kidney',
+  'dividing_neuron',
+  'periderm',
+  'blood_progenitor',
+  'otic_vesicle',
+  'neuron_dscam',
+  'neuron_sema3c',
+  'fin_bud',
+  'primitive_gut',
+  'primitive_heart'
 )
 
+names(cluster.ids) <- levels(so_earlydia)
+so_earlydia_named <- RenameIdents(so_earlydia, cluster.ids)
 
-DimPlot(so_singlets_split, reduction = "umap.cca", split.by = "orig.ident")
 
-DimPlot(so_singlets_split, reduction = "umap.cca", label = T)
+p <- DimPlot(so_earlydia_named, reduction = "umap", label = T, repel = T, pt.size = 1) + NoLegend()
+
+SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_annotated"),
+           height = 10, width = 10)
 ```
 
 ```{r}
-table(so_singlets_split$cca_clusters, so_singlets_split$orig.ident)
-```
+#mid dia
+cluster.ids <- c(
+  'neuron_progenitor',
+  'hibernating_neuron_progenitor',
+  'spinal_cord',
+  'epidermal',
+  'differentiating_neuron',
+  'somite',
+  'hindbrain',
+  'telencephalon/optic_cup',
+  'myotome/muscle',
+  'hatching_gland',
+  'floor_plate',
+  'blood',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'endothelial',
+  'periderm',
+  'epidermal_lye',
+  'neuron_sema3c'
+)
 
-Join Layers
+names(cluster.ids) <- levels(so_middia)
+so_middia_named <- RenameIdents(so_middia, cluster.ids)
 
-```{r}
-so_integrated <- JoinLayers(so_singlets_split)
-```
 
-Find and Save All Conserved Markers
-
-```{r}
-#for clusters that are shared between dia and dev
-
-Idents(so_integrated) <- "cca_clusters"
-
-all_conserved_markers <- data.frame()
-
-#clusters 0-14 for mzm
-#clusters 0-13 for grz
-for (i in levels(so_integrated)[1:14]){
-  markers <- FindConservedMarkers(so_integrated,
-                                  ident.1 = i,
-                                  grouping.var = "orig.ident",
-                                  verbose = F)  
-  markers$ident <- i
-  markers$gene <- rownames(markers)
-  rownames(markers) <- 1:nrow(markers)
-  all_conserved_markers <- rbind(all_conserved_markers, markers)
-  print(paste(i, "done"))
-}
+p <- DimPlot(so_middia_named, reduction = "umap", label = T, repel = T, pt.size = 1) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_annotated"),
+           height = 10, width = 10)
 ```
 
 ```{r}
-write.csv(all_conserved_markers, paste0(outs_dir, "/conserved_markers_new.csv"))
+#late dia
+cluster.ids <- c(
+  'neuron_progenitor',
+  'hibernating_neuron_progenitor_1',
+  'hibernating_neuron_progenitor_2',
+  'somite',
+  'midbrain_hindbrain_wnt1/lmx1b',
+  'spinal_cord',
+  'epidermal',
+  'neuron',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'hatching_gland',
+  'endothelial',
+  'telencephalon/optic_cup',
+  'blood',
+  'myotome/muscle',
+  'immune_cell'
+)
+
+names(cluster.ids) <- levels(so_latedia)
+so_latedia_named <- RenameIdents(so_latedia, cluster.ids)
+
+
+p <- DimPlot(so_latedia_named, reduction = "umap", label = T, repel = T, pt.size = 1) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_annotated"),
+           height = 10, width = 10)
+```
+
+```{r}
+#dev
+cluster.ids <- c(
+  'neuron_progenitor_1',
+  'neuron_progenitor_2',
+  'somite',
+  'neuron',
+  'spinal_cord',
+  'differentiating_neuron_1',
+  'epidermal_1',
+  'myotome/muscle',
+  'telencephalon/optic_cup',
+  'floor_plate',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'periderm',
+  'head_kidney',
+  'otic_vesicle',
+  'endothelial',
+  'hatching_gland',
+  'neural_crest',
+  'neuron_neurod1',
+  'midbrain_hindbrain_wnt1/lmx1b',
+  'pigment_cell',
+  'blood',
+  'neuron_sema3c',
+  'neuron_dscam',
+  'notochord',
+  'epidermal_unknown',
+  'pronephros',
+  'differentiating_neuron_2',
+  'primitive_gut'
+)
+
+names(cluster.ids) <- levels(so_dev)
+so_dev_named <- RenameIdents(so_dev, cluster.ids)
+
+so_dev_named$annotation <- Idents(so_dev_named)
+
+p <- DimPlot(so_dev_named, reduction = "umap", label = T, repel = T, pt.size = 1) + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_annotated"),
+           height = 10, width = 10)
+```
+
+```{r}
+#save individual objects
+saveRDS(so_predia_named, paste0(outs_dir, "markers_predia/so_predia.rds"))
+saveRDS(so_dev_named, paste0(outs_dir, "markers_dev/so_dev.rds"))
+saveRDS(so_earlydia_named, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
+saveRDS(so_middia_named, paste0(outs_dir, "markers_middia/so_middia.rds"))
+saveRDS(so_latedia_named, paste0(outs_dir, "markers_latedia/so_latedia.rds"))
+```
+
+## Add annotations to full object
+
+```{r}
+#get annotations for each subset
+predia <- Idents(so_predia_named)
+earlydia <- Idents(so_earlydia_named)
+middia <- Idents(so_middia_named)
+latedia <- Idents(so_latedia_named)
+dev <- Idents(so_dev_named)
+
+#combine annotations
+annotations_merged <- data.frame(c(predia, earlydia, middia, latedia, dev)) #merged annotation
+annotations_merged <- annotations_merged[row.names(so_filtered@meta.data),]
+
+#add to full seurat object
+so_filtered$annotation_merged <- annotations_merged
+
+#add column appending group
+so_filtered$annotation_grouped <- paste0(so_filtered$annotation_merged, "_", so_filtered$timepoint_group)
+
+#add simplified annotation by comining similar cell types
+#remove "_number" suffix or "?" prefix
+so_filtered$annotation_merged <- gsub("^\\?|_\\d+", "", so_filtered$annotation_merged)
+
+#make plots
+p <- DimPlot(so_filtered, group.by = "annotation_merged", reduction = "umap", repel = T, label = T) + NoLegend()
+SaveFigure(p, paste0(outs_dir, "figures/umap_annotated_combined"), height = 10, width = 10)
+
+```
+
+### Save Annotated object
+
+```{r}
+#save object
+
+saveRDS(so_filtered, paste0(outs_dir, "so_annotated.rds"))
+# so_filtered <- readRDS(paste0(outs_dir, "so_annotated.rds"))
+```
+
+## Broad cell types for nicer visualization
+
+```{r}
+broad <- c(
+  "myotome/muscle" = "myotome/muscle",
+  "dividing_neuron" = "neuron_progenitor",
+  "hibernating_neuron_progenitor" = "neuron_progenitor",
+  "periderm" = "periderm",
+  "spinal_cord" = "spinal_cord",
+  "midbrain_hindbrain_pax2/5_en1/2" = "midbrain_hindbrain_pax2/5_en1/2",
+  "neuron_progenitor" = "neuron_progenitor",
+  "somite" = "somite",
+  "neuron" = "neuron",
+  "tail_bud" = "tail_bud",
+  "differentiating_neuron" = "differentiating_neuron",
+  "hatching_gland" = "hatching_gland",
+  "pigment_cell" = "pigment_cell",
+  "epidermal" = "epidermal",
+  "hindbrain" = "neuron_progenitor",
+  "floor_plate" = "neuron_progenitor",
+  "telencephalon/optic_cup" = "telencephalon/optic_cup",
+  "endothelial" = "endothelial",
+  "head_kidney" = "head_kidney",
+  "blood" = "blood",
+  "otic_vesicle" = "otic_vesicle",
+  "hibernating_unknown" = "hibernating_unknown",
+  "neuron_neurod1" = "neuron",
+  "neuron_sema3c" = "neuron_sema3c",
+  "neuron_dscam" = "neuron_dscam",
+  "midbrain_hindbrain_wnt1/lmx1b" = "midbrain_hindbrain_wnt1/lmx1b",
+  "neural_crest" = "neural_crest",
+  "epidermal_unknown" = "epidermal",
+  "blood_progenitor" = "blood",
+  "primitive_gut" = "primitive_gut",
+  "pronephros" = "pronephros",
+  "primitive_heart" = "primitive_heart",
+  "fin_bud" = "fin_bud",
+  "notochord" = "notochord",
+  "epidermal_lye" = "epidermal",
+  "immune_cell" = "immune_cell"
+)
+
+Idents(so_filtered) <- "annotation_merged"
+so_filtered <- RenameIdents(so_filtered, broad)
+so_filtered$annotation_broad <- Idents(so_filtered)
+```
+
+```{r}
+colors = palette36.colors(28)
+colors <- sortByHue(colors)
+
+Idents(so_filtered) <- factor(Idents(so_filtered), levels = c(
+  "myotome/muscle",
+  "head_kidney",
+  "somite",
+  "tail_bud",
+  "endothelial",
+  "blood",
+  "neuron_sema3c",
+  "neuron_dscam",
+  "neuron",
+  "differentiating_neuron",
+  "spinal_cord",
+  "neuron_progenitor",
+  "midbrain_hindbrain_pax2/5_en1/2",
+  "midbrain_hindbrain_wnt1/lmx1b",
+  "telencephalon/optic_cup",
+  "hibernating_unknown",
+  "epidermal",
+  "neural_crest",
+  "periderm",
+  "otic_vesicle",
+  "primitive_gut",
+  "pronephros",
+  "hatching_gland",
+  "pigment_cell",
+  "notochord",
+  "fin_bud",
+  "primitive_heart",
+  "immune_cell"
+))
+
+#set levels of metadata column
+so_filtered$annotation_broad <- Idents(so_filtered)
+
+names(colors) <- levels(Idents(so_filtered))
+swatch(colors)
+```
+
+```{r}
+p <- DimPlot(so_filtered, reduction = "umap", cols = colors, pt.size = 0.7)
+
+SaveFigure(p, paste0(outs_dir, "figures/umap_annotated_broad"), height = 10, width = 17)
 
 ```
 
 ```{r}
-#for development specific clusters
+Idents(so_filtered) <- "annotation_grouped"
+Cluster_Highlight_Plot(seurat_object = so_filtered, cluster_name = "periderm_latedia", highlight_color = "gold",
+background_color = "lightgray",  pt.size = 1, reduction = "umap")
 
-markers.14 <- FindMarkers(so_integrated,
-                         ident.1 = "14")
-markers.14$ident <- "14"
-markers.14$gene <- rownames(markers.14)
-rownames(markers.14) <- 1:nrow(markers.14)
+Cluster_Highlight_Plot(seurat_object = so_filtered, cluster_name = "differentiating_neuron_middia", highlight_color = "gold",
+background_color = "lightgray",  pt.size = 1, reduction = "umap")
 
+Cluster_Highlight_Plot(seurat_object = so_filtered, cluster_name = "differentiating_neuron_earlydia", highlight_color = "gold",
+background_color = "lightgray",  pt.size = 1, reduction = "umap")
 
-markers.15 <- FindMarkers(so_integrated,
-                         ident.1 = "15")
-markers.15$ident <- "15"
-markers.15$gene <- rownames(markers.15)
-rownames(markers.15) <- 1:nrow(markers.15)
+Cluster_Highlight_Plot(seurat_object = so_filtered, cluster_name = "differentiating_neuron_predia", highlight_color = "gold",
+background_color = "lightgray",  pt.size = 1, reduction = "umap")
 
-
-dev_specific_markers <- rbind(markers.14, markers.15)
-```
-
-```{r}
-write.csv(dev_specific_markers, paste0(outs_dir, "/dev_specific_markers_new.csv"))
-
-```
-
-Annotate Clusters
-
-```{r}
-# #MZM Genome
-# cluster.ids <- c("neuron progenitor",	"mature neuron",
-#                 "spinal cord",	"somite",	"midbrain/hindbrain",
-#                 "telencephalon/optic cup",	"epidermal",	"blood",
-#                 "myotome/muscle",	"hatching gland",	"otic vesicle",
-#                 "endothelial",	"pigment cell",	"sema3c neuron",
-#                 "notochord",	"periderm",	"lens")
-
-# #GRZ Genome
-cluster.ids <- c("neuroblast",	"somite",	"spinal cord/neural tube",	"mature neuron",
-                 "telencephalon/optic cup", "neural progenitor",	"epidermal", "midbrain/hindbrain",
-                 "hatching gland","otic vesicle", "blood",	"endothelial",	"pigment cell",
-                 "myotome/muscle","notochord", "lens")
-
-names(cluster.ids) <- levels(so_integrated)
-so_integrated <- RenameIdents(so_integrated, cluster.ids)
-
-DimPlot(so_integrated, reduction = "umap", label = TRUE,
-        pt.size = 0.5, split.by = "devtraj")
-
-DimPlot(so_integrated, reduction = "umap.cca", label = TRUE,
-        pt.size = 0.5, split.by = "devtraj")
-```
-
-```{r}
-so_integrated$annotations <- Idents(so_integrated)
-
-table(so_integrated$annotations, so_integrated$devtraj)
-```
-
-```{r}
-saveRDS(so_integrated, paste0(outs_dir, "/so_annotated.rds"))
-```
-
-```{r}
-sessionInfo()
+Cluster_Highlight_Plot(seurat_object = so_filtered, cluster_name = "neuron_predia", highlight_color = "gold",
+background_color = "lightgray",  pt.size = 1, reduction = "umap")
 ```
 
 ## Neuronal Subclustering
 
 ```{r}
 so_neurons <- subset(
-  x = so_integrated,
-  annotations %in% c("neuron progenitor", "mature neuron", "spinal cord",
-                     "midbrain/hindbrain", "telencephalon/optic cup", 
-                     "sema3c neuron")
+  x = so_filtered,
+  annotation_combined %in% c(
+    'dividing_neuron',
+    'hibernating_unknown',
+    'spinal_cord',
+    'midbrain_hindbrain_boundary',
+    'neuron_progenitor',
+    'neuron',
+    'hibernating_neuron_progenitor',
+    'differentiating_neuron',
+    'telencephalon/optic_cup',
+    'trigeminal_ganglion?',
+    'floor_plate_neural_tube',
+    'hindbrain'
+  )
 )
 
+so_neurons <- runSeuratRNAProcessing(so_neurons)
+
+p <- DimPlot(so_neurons, reduction = "umap", group.by = "annotation_combined", label = T, repel = T) + NoLegend()
+
+SaveFigure(p, paste0(outs_dir, "figures/umap_neurons"), height = 7, width = 7)
+```
+
+#Figures for grant 1/07/24
+
+```{r}
+#add broader annotations
+
+annotation_broad <- c(
+  "somite" = "somite",
+  "dividing_neuron" = "neuron_progenitor",
+  "hibernating_unknown" = "neuron_progenitor",
+  "epidermal" = "epidermal",
+  "spinal_cord" = "neuron_progenitor",
+  "midbrain_hindbrain_boundary" = "midbrain_hindbrain_boundary",
+  "neuron_progenitor" = "neuron_progenitor",
+  "neuron" = "neuron",
+  "hibernating_neuron_progenitor" = "neuron_progenitor",
+  "differentiating_neuron" = "differentiating_neuron",
+  "hatching_gland" = "hatching_gland",
+  "pigment_cell" = "pigment_cell",
+  "myotome/muscle" = "myotome/muscle",
+  "telencephalon/optic_cup" = "telencephalon/optic_cup",
+  "endothelial" = "endothelial",
+  "head_kidney" = "head_kidney",
+  "blood" = "blood",
+  "otic_vesicle" = "otic_vesicle",
+  "trigeminal_ganglion?" = "neuron",
+  "leukocyte" = "leukocyte",
+  "floor_plate_neural_tube" = "neuron_progenitor",
+  "hindbrain" = "neuron_progenitor",
+  "periderm" = "epidermal",
+  "blood_progenitor" = "blood",
+  "pronephros" = "epidermal",
+  "primitive_heart" = "primitive_heart",
+  "gut" = "epidermal",
+  "tail_bud" = "tail_bud",
+  "mytome/muscle" = "somite",
+  "notochord" = "notochord",
+  "fin_bud" = "epidermal"
+)
+
+annotation_broad_neuron <- c(
+  "dividing_neuron" = "neuron_progenitor",
+  "hibernating_unknown" = "neuron_progenitor",
+  "spinal_cord" = "spinal_cord",
+  "midbrain_hindbrain_boundary" = "midbrain_hindbrain_boundary",
+  "neuron_progenitor" = "neuron_progenitor",
+  "neuron" = "neuron",
+  "hibernating_neuron_progenitor" = "neuron_progenitor",
+  "differentiating_neuron" = "differentiating_neuron",
+  "telencephalon/optic_cup" = "telencephalon/optic_cup",
+  "trigeminal_ganglion?" = "neuron",
+  "floor_plate_neural_tube" = "neuron_progenitor",
+  "hindbrain" = "neuron_progenitor"
+)
+
+Idents(so_filtered) <- "annotation_combined"
+so_filtered <- RenameIdents(so_filtered, annotation_broad)
+so_filtered$annotation_broad <- Idents(so_filtered)
+
+Idents(so_neurons) <- "annotation_combined"
+so_neurons <- RenameIdents(so_neurons, annotation_broad_neuron)
+so_neurons$annotation_broad <- Idents(so_neurons)
+
+so_neurons$annotation_broad_devtraj <- paste0(so_neurons$annotation_broad, "_", so_neurons$devtraj)
 
 
-DimPlot(so_neurons, reduction = "umap.cca")
+
+DimPlot(so_neurons, label = T, repel = T, reduction = "umap")
 ```
 
 ```{r}
+broad_cols <- c(
+  "neuron_progenitor" = "#B66DFF",
+  "midbrain_hindbrain_boundary" = "#B6DBFF",
+  "telencephalon/optic_cup" = "#006DDB",
+  "differentiating_neuron" = "#24FF24",
+  "neuron" = "#009966",
+  "somite" = "#DB6D00",
+  "myotome/muscle" = "#920000",
+  "epidermal" = "#FFC20A",
+  "pigment_cell" = "#CDDEB7",
+  "otic_vesicle" = "#CC9900",
+  "tail_bud" = "#EC407A",
+  "blood" = "#E377C2",
+  "endothelial" = "#BCBD22",
+  "head_kidney" = "#17BECF",
+  "primitive_heart" = "#0000CC",
+  "hatching_gland" = "#2CA02C",
+  "notochord" = "#C5B0D5",
+  "leukocyte" = "#FF9900"
+)
 
-so_neurons <- RunUMAP(so_neurons, reduction = "integrated.cca", dims = 1:30, reduction.name = "umap.cca.neuron")
-DimPlot(so_neurons, reduction = "umap.cca.neuron", split.by = "devtraj")
-
-so_neurons <- FindNeighbors(so_neurons, reduction = "integrated.cca", dims = 1:30)
-so_neurons <- FindClusters(so_neurons, cluster.name = "neuron_subclust")
-
-DimPlot(so_neurons, reduction = "umap.cca.neuron")
-
-FeaturePlot(so_neurons, features = neural_crest[1], reduction = "umap.cca.neuron")
-
-table(so_neurons$neuron_subclust, so_neurons$orig.ident)
-  
+broad_cols_neuron <- c(
+  "neuron_progenitor_dia" = "#1F78B4",
+  "spinal_cord_dia" = "#33A02C",
+  "midbrain_hindbrain_boundary_dia" = "#E31A1C",
+  "telencephalon/optic_cup_dia" = "#FF7F00",
+  "differentiating_neuron_dia" = "#6A3D9A",
+  "neuron_dia" = "#B15928",
+  "neuron_progenitor_pre-dia" = "#A6CEE3",
+  "spinal_cord_pre-dia" = "#B2DF8A",
+  "midbrain_hindbrain_boundary_pre-dia" = "#FB9A99",
+  "telencephalon/optic_cup_pre-dia" = "#FDBF6F",
+  "differentiating_neuron_pre-dia" = "#CAB2D6",
+  "neuron_pre-dia" = "#FFFF99",
+  "neuron_progenitor_dev" = "#A6CEE3",
+  "spinal_cord_dev" = "#B2DF8A",
+  "midbrain_hindbrain_boundary_dev" = "#FB9A99",
+  "telencephalon/optic_cup_dev" = "#FDBF6F",
+  "differentiating_neuron_dev" = "#CAB2D6",
+  "neuron_dev" = "#FFFF99"
+)
 ```
 
 ```{r}
-all_conserved_neuron_markers <- data.frame()
+p1 <- DimPlot(so_filtered, group.by = "devtraj", reduction = "umap",
+              cols = c("#FBA91A", "#2C6E49" , "#800080"))
+p2 <- DimPlot(so_filtered, group.by = "annotation_broad", reduction = "umap",
+              cols = broad_cols,
+              label = F)
 
-for (i in levels(so_neurons)){
-  markers <- FindConservedMarkers(so_neurons,
-                                  ident.1 = i,
-                                  grouping.var = "devtraj",
-                                  verbose = F)  
-  markers$ident <- i
-  markers$gene <- rownames(markers)
-  rownames(markers) <- 1:nrow(markers)
-  all_conserved_neuron_markers <- rbind(all_conserved_neuron_markers, markers)
-  print(paste(i, "done"))
-}
+p3 <- DimPlot(so_neurons, group.by = "devtraj", reduction = "umap",
+              cols = c("#FBA91A", "#2C6E49" , "#FBA91A"))
+p4 <- DimPlot(so_neurons, group.by = "annotation_broad_devtraj", reduction = "umap",
+              cols = broad_cols_neuron,
+              label = F)
 
-write.csv(all_conserved_neuron_markers, "../results/conserved_neuron_markers.csv")
+SaveFigure(p1, type = "pdf", paste0(outs_dir, "figures/param_grant_all_devtraj"), height = 7, width = 10)
+SaveFigure(p2, type = "pdf", paste0(outs_dir, "figures/param_grant_all_cluster"), height = 7, width = 11)
+SaveFigure(p3, type = "pdf", paste0(outs_dir, "figures/param_grant_neuron_devtraj"), height = 7, width = 10)
+SaveFigure(p4, type = "pdf", paste0(outs_dir, "figures/param_grant_neuron_cluster"), height = 7, width = 11)
+
+```
+
+```{r}
+#progenitor (lfng)
+progenitor_feature <- FeaturePlot(so_neurons, features = c("lfng"), reduction = "umap")
+
+#differentiating (dll1)
+differentiating_feature <- FeaturePlot(so_neurons, features = c("LOC107386323"), reduction = "umap")
+
+#neuron (elavl3)
+neuron_feature <- FeaturePlot(so_neurons, features = c("elavl3"), reduction = "umap")
+
+#spinal cord (grik2)
+spinal_feature <- FeaturePlot(so_neurons, features = c("LOC107391393"), reduction = "umap")
+
+#telencephalon
+telencephalon_feature <- FeaturePlot(so_neurons, features = c("ntrk2"), reduction = "umap")
+
+#mb/hb
+mbhb_feature <- FeaturePlot(so_neurons, features = c("pax5"), reduction = "umap")
+
+
+SaveFigure(progenitor_feature, type = "pdf", paste0(outs_dir, "figures/neuron_progenitor_lfng"),
+           height = 7, width = 9)
+SaveFigure(differentiating_feature, type = "pdf", paste0(outs_dir, "figures/differentiating_neuron_dll1(1of4)"),
+           height = 7, width = 9)
+SaveFigure(neuron_feature, type = "pdf", paste0(outs_dir, "figures/neuron_elavl3"),
+           height = 7, width = 9)
+SaveFigure(spinal_feature, type = "pdf", paste0(outs_dir, "figures/spinal_cord_grik2(4of4)"),
+           height = 7, width = 9)
+SaveFigure(telencephalon_feature, type = "pdf", paste0(outs_dir, "figures/telencephalon_optic_cup_ntrk2"),
+           height = 7, width = 9)
+SaveFigure(mbhb_feature, type = "pdf", paste0(outs_dir, "figures/midbrain_hindbrain_boundary_pax5"),
+           height = 7, width = 9)
+
 ```

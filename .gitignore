@@ -2,7 +2,12 @@
 .Rhistory
 .RData
 .Ruserdata
+.RDataTmp
 aggr_all_outs/
+aggr_batch1-2_outs/
+aggr_batch1-3/
 genome/
 genome_2015/
 results_all/
+results_batch1-2/
+results_scratch/

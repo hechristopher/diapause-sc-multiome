@@ -36,9 +36,9 @@ use relative paths
 
 
 # all aggregated
-filtered_path <- "../aggr_all_outs/filtered_feature_bc_matrix.h5"
-raw_path <- "../aggr_all_outs/raw_feature_bc_matrix.h5"
-fragments_path <- "../aggr_all_outs/atac_fragments.tsv.gz"
+filtered_path <- "../aggr_batch1-3/filtered_feature_bc_matrix.h5"
+raw_path <- "../aggr_batch1-3/raw_feature_bc_matrix.h5"
+fragments_path <- "../aggr_batch1-3/atac_fragments.tsv.gz"
 annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
 
 outs_dir <- "../results_all/"
@@ -46,7 +46,7 @@ fig_path <- "../results_all/figures/"
 
 
 #add sample names here in order of aggr library file
-sample_names <- c("dev1d_1", "dia6d_1", "dev1d_2", "dia6d_2", "dev1d_3", "dia1d_1", "dia2d_1", "hb_1")
+sample_names <- c("25som_1", "hb_1", "hb_2", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2", "dia1mo_1", "dia3mo_1", "dev1d_1", "dev1d_2", "dev1d_3")
 ```
 
 ## Helper Functions
@@ -236,13 +236,19 @@ Add metadata columns for sample of origin and developmental trajectory
 ```{r}
 #change orig.ident to sample identity based on barcode
 
-so_multi$orig.ident <- sample_names[as.numeric(substr(rownames(so_multi@meta.data), nchar(rownames(so_multi@meta.data)), nchar(rownames(so_multi@meta.data))))]
+so_multi$orig.ident <- sample_names[as.numeric(str_split_i(rownames(so_multi@meta.data), "-",2))]
 
 
 #developmental trajectory of each sample in order of aggr library
-devtraj <- c("dev", "dia", "dev", "dia", "dev", "dia", "dia", "pre-dia")
+devtraj <- c("pre-dia", "pre-dia", "pre-dia", "dia", "dia", "dia", "dia", "dia", "dia", "dev", "dev", "dev")
+so_multi$devtraj <- devtraj[as.numeric(str_split_i(rownames(so_multi@meta.data), "-",2))]
+so_multi$devtraj <- factor(so_multi$devtraj, levels = c("pre-dia", "dev", "dia"))
 
-so_multi$devtraj <- devtraj[as.numeric(substr(rownames(so_multi@meta.data), nchar(rownames(so_multi@meta.data)), nchar(rownames(so_multi@meta.data))))]
+
+#combine dev and pre-dia into dev
+diadev <- c("dev", "dev", "dev", "dia", "dia", "dia", "dia", "dia", "dia", "dev", "dev", "dev")
+so_multi$diadev <- diadev[as.numeric(str_split_i(rownames(so_multi@meta.data), "-",2))]
+so_multi$diadev <- factor(so_multi$diadev, levels = c("dev", "dia"))
 
 
 
@@ -250,8 +256,7 @@ so_multi$devtraj <- devtraj[as.numeric(substr(rownames(so_multi@meta.data), ncha
 meta <- so_multi@meta.data
 
 meta$orig.ident <- factor(meta$orig.ident, 
-                          levels = c("dev1d_1", "dev1d_2", "dev1d_3","hb_1", 
-                                     "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
+                          levels = sample_names)
 so_multi@meta.data <- meta
 ```
 
@@ -260,201 +265,16 @@ Save Seurat Object
 ```{r}
 saveRDS(so_multi, paste0(outs_dir, "so_postSoup.rds"))
 
-# so_multi <- readRDS(paste0(outs_dir, "so_postSoup.rds"))
-```
-
-# Doublet identification
-
-```{r}
-#subset seurat object by sample
-so_subsets <- vector("list", length(sample_names))
-
-for(i in seq_along(sample_names)){
-  so_subsets[[i]] <- subset(so_multi, subset = orig.ident == sample_names[i])
-}
-```
-
-```{r}
-#plot nFeature, nCount, percent mt for each sample
-for(so in so_subsets){
-  plotFeatures(so)
-}
-
-```
-
-## Functions for running doublet finder
-
-```{r}
-#run through seurat preprocessing steps and find filtering paramters and dimensionality
-plotFeatures <- function(so){
-  mito_genes <- c("KEG92-p13", "KEG92-p12", "KEG92-p11",
-                  "KEG92-p10", "KEG92-p09", "KEG92-p08",
-                  "KEG92-p07", "KEG92-p06", "KEG92-p05",
-                  "KEG92-p04", "KEG92-p03", "KEG92-p02", "KEG92-p01")
-  so[["percent.mt"]] <- PercentageFeatureSet(so, features = mito_genes, assay = 'RNA')
-  p1 <- VlnPlot(so, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
-  print(quantile(so$nFeature_RNA, 0.99))
-  plot(p1)
-}
-
-runDoubletFinderPreprocessing <- function(so, nFeature_RNA_max, nFeature_RNA_min, percent.mt_max) {
-  # PREPROCESSING
-  # Run through Seurat preprocessing steps
-  so_filtered <- subset(so, subset = nFeature_RNA > nFeature_RNA_min & nFeature_RNA < nFeature_RNA_max & percent.mt < percent.mt_max)
-  p2 <- VlnPlot(so_filtered, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"))
-  plot(p2)
-  so_filtered <- NormalizeData(object = so_filtered)
-  so_filtered <- FindVariableFeatures(object = so_filtered)
-  so_filtered <- ScaleData(object = so_filtered)
-  so_filtered <- RunPCA(object = so_filtered)
-  p3 <- ElbowPlot(so_filtered, ndims = 30)
-  plot(p3)
-  return(so_filtered)
-}
-
-runDoubletFinder <- function(so, dims, multiplet_rate, pK = 0){
-  so <- FindNeighbors(object = so, dims = 1:dims)
-  so <- FindClusters(object = so)
-  so <- RunUMAP(object = so, dims = 1:dims)
-  p1 <- DimPlot(so)
-  plot(p1)
-  
-  #PK Identification
-  if(pK == 0){
-      sweep.res.list <- paramSweep(so, PCs = 1:dims, sct = FALSE)
-    sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
-    sweep.stats
-    bcmvn <- find.pK(sweep.stats)
-    p2 <- ggplot(bcmvn, aes(pK, BCmetric, group = 1)) +
-      geom_point() +
-      geom_line()
-    plot(p2)
-    pK <- bcmvn %>% # select the pK that corresponds to max bcmvn to optimize doublet detection
-      filter(BCmetric == max(BCmetric)) %>%
-      select(pK) 
-    pK <- as.numeric(as.character(pK[[1]]))
-  }
-
-  # HOMOTYPIC DOUBLETS
-  annotations <- so@meta.data$seurat_clusters
-  homotypic.prop <- modelHomotypic(annotations)         
-  nExp_poi <- round(multiplet_rate*nrow(so@meta.data)) # must be adjusted per sample based on 10x multiplet rate (in user guide)
-  nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-  # RUN DOUBLET FINDER 
-  so <- doubletFinder(so,
-                      PCs = 1:dims, # based on dims
-                      pN = 0.25, # default set
-                      pK = pK, # provide optimal pK value through the variable
-                      nExp = nExp_poi.adj, # provide expected # of doublets after homtotypic adjustment
-                      reuse.pANN = FALSE, sct = FALSE) # false because this is the first time running doubletfinder on this sample (dont have a pANN to reuse), also did not run sctransform on the data so false also
-  
-  # VISUALIZE DOUBLETS
-
-  p3 <- DimPlot(so, reduction = 'umap',
-          group.by = colnames(so@meta.data)[length(colnames(so@meta.data))])
-  plot(p3)
-  print(table(so@meta.data[,length(colnames(so@meta.data))]))
-  return(so)
-}
-```
-
-## Run doublet finder on each sample
-
-```{r}
-so_1_filtered <- runDoubletFinderPreprocessing(so_1,
-                              nFeature_RNA_max = 3000,
-                              nFeature_RNA_min = 200,
-                              percent.mt_max = 20)
-
-#set multiplet rate based on # of cells
-#first time run, do not set pk, DF will automatically pick suitable value
-#if DF is unable to pick a suitable value, set it manually
-so_1_postDF <- runDoubletFinder(so_1_filtered,
-                                     dims = 20,
-                                     multiplet_rate = 0.077,
-                                     )
-```
-
-```{r}
-so_2_filtered <- runDoubletFinderPreprocessing(so_2,
-                              nFeature_RNA_max = 2500,
-                              nFeature_RNA_min = 200,
-                              percent.mt_max = 10)
-
-#set multiplet rate based on # of cells
-#first time run, do not set pk, DF will automatically pick suitable value
-#if DF is unable to pick a suitable value, set it manually
-so_2_postDF <- runDoubletFinder(so_2_filtered,
-                                     dims = 20,
-                                     multiplet_rate = 0.054)
-```
-
-```{r}
-so_3_filtered <- runDoubletFinderPreprocessing(so_3,
-                              nFeature_RNA_max = 2500,
-                              nFeature_RNA_min = 200,
-                              percent.mt_max = 10)
-
-#set multiplet rate based on # of cells
-#first time run, do not set pk, DF will automatically pick suitable value
-#if DF is unable to pick a suitable value, set it manually
-so_3_postDF <- runDoubletFinder(so_3_filtered,
-                                     dims = 20,
-                                     multiplet_rate = 0.077)
-```
-
-```{r}
-so_4_filtered <- runDoubletFinderPreprocessing(so_4,
-                              nFeature_RNA_max = 3000,
-                              nFeature_RNA_min = 200,
-                              percent.mt_max = 20)
-
-#set multiplet rate based on # of cells
-#first time run, do not set pk, DF will automatically pick suitable value
-#if DF is unable to pick a suitable value, set it manually
-so_4_postDF <- runDoubletFinder(so_4_filtered,
-                                     dims = 20,
-                                     multiplet_rate = 0.077)
-```
-
-### Merge post DF objects
-
-```{r}
-#create new metadata column with DF classifications
-DF.classifications <- data.frame(
-  row.names = c(rownames(so_1_postDF@meta.data),
-                rownames(so_2_postDF@meta.data),
-                rownames(so_3_postDF@meta.data),
-                rownames(so_4_postDF@meta.data)),
-  DF.classifications = c(so_1_postDF@meta.data[,ncol(so_1_postDF@meta.data)],
-                         so_2_postDF@meta.data[,ncol(so_2_postDF@meta.data)],
-                         so_3_postDF@meta.data[,ncol(so_3_postDF@meta.data)],
-                         so_4_postDF@meta.data[,ncol(so_4_postDF@meta.data)])
-)
-
-#subset to remove cells filtered out during DF classification
-so_multi_postDF <- subset(so_multi, cells = rownames(DF.classifications))
-
-#add new metadata column to seurat object
-so_multi_postDF$DF.classifications <- DF.classifications[rownames(so_multi_postDF@meta.data),]
-table(so_multi_postDF$DF.classifications)
-```
-
-```{r}
-saveRDS(so_multi_postDF, paste0(outs_dir, "so_multi_postDF.rds"))
+so_multi <- readRDS(paste0(outs_dir, "so_postSoup.rds"))
 ```
 
 ## Run scDblFinder on GEX and ATAC
 
-```{r}
-# so_multi <- LoadSeuratRds("../results/so_multi_postDF.rds")
-```
-
 Convert to single cell experiment
 
 ```{r}
-sce_multi_gex <- as.SingleCellExperiment(so_multi_postDF, assay = "RNA")
-sce_multi_atac <- as.SingleCellExperiment(so_multi_postDF, assay = "ATAC")
+sce_multi_gex <- as.SingleCellExperiment(so_multi, assay = "RNA")
+sce_multi_atac <- as.SingleCellExperiment(so_multi, assay = "ATAC")
 
 ```
 
@@ -466,7 +286,7 @@ sce_multi_gex <- scDblFinder(sce_multi_gex, samples = "orig.ident")
 table(sce_multi_gex$scDblFinder.class)
 
 
-scDblFinder_results_gex <- data.frame(sce_multi_gex@colData[,length(sce_multi_gex@colData)-3:length(sce_multi_gex@colData)]) #last 3 cols
+scDblFinder_results_gex <- data.frame(sce_multi_gex@colData[,(length(sce_multi_gex@colData)-3):length(sce_multi_gex@colData)]) #last 4 cols
 colnames(scDblFinder_results_gex) <- paste0(colnames(scDblFinder_results_gex), ".gex")
 ```
 
@@ -475,9 +295,10 @@ scDblFinder for ATAC
 ```{r}
 sce_multi_atac <- scDblFinder(sce_multi_atac, aggregateFeatures=TRUE, nfeatures=25, processing="normFeatures", samples = "orig.ident")
 
-table(sce_multi_atac$scDblFinder.class, sce_multi_atac$DF.classifications)
+table(sce_multi_atac$scDblFinder.class)
 
-scDblFinder_results_atac <- data.frame(sce_multi_atac@colData[,length(sce_multi_atac@colData)-3:length(sce_multi_atac@colData)])
+scDblFinder_results_atac <- data.frame(sce_multi_atac@colData[,(length(sce_multi_atac@colData)-3):length(sce_multi_atac@colData)]) #last 3 cols
+
 colnames(scDblFinder_results_atac) <- paste0(colnames(scDblFinder_results_atac),
                                              ".atac")
 ```
@@ -487,13 +308,13 @@ Save results to seurat object metadata
 ```{r}
 scDblFinder_results <- cbind(scDblFinder_results_gex, scDblFinder_results_atac )
 
-scDblFinder_results <- scDblFinder_results[rownames(so_multi_postDF@meta.data),]
+scDblFinder_results <- scDblFinder_results[rownames(so_multi@meta.data),]
 
-so_multi_postDF@meta.data <- cbind(so_multi_postDF@meta.data, scDblFinder_results)
+so_multi@meta.data <- cbind(so_multi@meta.data, scDblFinder_results)
 ```
 
 ```{r}
-saveRDS(so_multi_postDF, paste0(outs_dir, "so_multi_allDoublets.rds"))
+saveRDS(so_multi, paste0(outs_dir, "so_multi_allDoublets.rds"))
 
 so_multi_postDF <- readRDS(paste0(outs_dir, "so_multi_allDoublets.rds"))
 ```
@@ -507,12 +328,12 @@ Amulet for ATAC
 # repeats <- GRanges("chr6", IRanges(1000,2000))
 # it's better to combine these with mitochondrial and sex chromosomes
 
-otherChroms <- GRanges(c("NC.011814.1", "NW.026539914.1"),IRanges(1L,width=19527))
-# here since I don't know what chromosome notation you'll be using I've just put them all,
-# although this will trigger a warning when combining them:
-toExclude <- otherChroms
-# we then launch the method
-res <- amulet(fragments_path, regionsToExclude = otherChroms, fullInMemory = TRUE)
+# otherChroms <- GRanges(c("NC.011814.1", "NW.026539914.1"),IRanges(1L,width=19527))
+# # here since I don't know what chromosome notation you'll be using I've just put them all,
+# # although this will trigger a warning when combining them:
+# toExclude <- otherChroms
+# # we then launch the method
+# res <- amulet(fragments_path, regionsToExclude = otherChroms, fullInMemory = TRUE)
 ```
 
 ```{r}
@@ -525,9 +346,6 @@ so_multi_postDF <- RunUMAP(so_multi_postDF, dims = 1:30, verbose = FALSE, reduct
 DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "scDblFinder.class.gex")
 
 DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "scDblFinder.class.atac")
-
-DimPlot(object = so_multi_postDF, reduction = "umap_RNA", group.by = "DF.classifications")
-
 ```
 
 ## Final Filtering
@@ -566,7 +384,7 @@ plot <- VlnPlot(
   features = c("nFeature_RNA","nCount_RNA","percent.mt"),
   ncol = 3,
 )
-SaveFigure(plot, "qc_vln_rna", width = 12, height = 6)
+SaveFigure(plot, "qc_vln_rna", width = 20, height = 6)
 
 #ATAC QC
 DefaultAssay(so_multi_postDF) <- "ATAC"
@@ -575,7 +393,7 @@ plot <- VlnPlot(
   features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
   ncol = 3,
 )
-SaveFigure(plot, "qc_vln_atac", width = 12, height = 6)
+SaveFigure(plot, "qc_vln_atac", width = 20, height = 6)
 
 ```
 
@@ -797,40 +615,35 @@ so_unfiltered <- runSeuratRNAProcessing(so_unfiltered)
 ```
 
 ```{r}
-p_devtraj <- DimPlot(so_unfiltered, group.by = "devtraj",
-        cols = c("#FBA91A", "#2C6E49" , "cadetblue1"),  label = TRUE)
-p_orig.ident <- DimPlot(so_unfiltered, group.by = "orig.ident",
-        cols = c("#FBA91A", "#FBA91A", "#FBA91A",
-                 "cadetblue1", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
-p_scDblFinder <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex")
-p_clusters <- DimPlot(so_unfiltered)
-
-p <- ggarrange(p_devtraj, p_orig.ident, p_scDblFinder, p_clusters, ncol = 2, nrow = 2)
-SaveFigure(p, "unfiltered_umaps", width = 20, height = 10)
-
-```
-
-```{r}
-
-
-so_filtered_medium <- runSeuratRNAProcessing(so_filtered_medium)
-
-so_filtered_medium$orig.ident <- factor(so_filtered_medium$orig.ident, 
-                          levels = c("dev1d_1", "dev1d_2", "dev1d_3","hb_1", 
-                                     "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2"))
-
-```
-
-```{r}
-p_devtraj <- DimPlot(so_filtered_medium, group.by = "devtraj",
+p_devtraj <- DimPlot(so_unfiltered, group.by = "devtraj", reduction = "umap",
         cols = c("#FBA91A", "#2C6E49" , "#800080"),  label = TRUE)
-p_orig.ident <- DimPlot(so_filtered_medium, group.by = "orig.ident",
-        cols = c("#FBA91A", "#FBA91A", "#FBA91A",
-                 "#800080", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"))
-p_scDblFinder <- DimPlot(so_filtered_medium, group.by = "scDblFinder.class.gex")
-p_clusters <- DimPlot(so_filtered_medium)
+p_orig.ident <- DimPlot(so_unfiltered, group.by = "orig.ident", reduction = "umap",
+        cols = c("#E496EF","#800080", "#800080",
+                 "#00E5FF", "#A5DB6B", "#0B62AF", "#0B62AF", "#2C6E49", "#55E67E",
+                 "#FBA91A", "#FBA91A", "#FBA91A"))
+p_scDblFinder <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex", reduction = "umap")
 
 p <- ggarrange(p_devtraj, p_orig.ident, p_scDblFinder, p_clusters, ncol = 2, nrow = 2)
+SaveFigure(p, "unfiltered_umaps", width = 15, height = 10)
+
+```
+
+```{r}
+so_filtered_medium <- runSeuratRNAProcessing(so_filtered_medium)
+```
+
+```{r}
+#Developmental Trajcetory
+p_devtraj <- DimPlot(so_filtered_medium, group.by = "devtraj", reduction = "umap",
+        cols = c("#FBA91A", "#2C6E49" , "#800080"),  label = TRUE)
+#Timepoint
+p_orig.ident <- DimPlot(so_filtered_medium, group.by = "orig.ident", reduction = "umap",
+        cols = c("#E496EF","#800080", "#800080",
+                 "#00E5FF", "#A5DB6B", "#0B62AF", "#0B62AF", "#2C6E49", "#55E67E",
+                 "#FBA91A", "#FBA91A", "#FBA91A"))
+p_clusters <- DimPlot(so_filtered_medium, reduction = "umap")
+
+p <- ggarrange(p_devtraj, p_orig.ident, p_clusters, ncol = 2, nrow = 2)
 SaveFigure(p, "medium_filtered_umaps", width = 15, height = 10)
 ```
 
@@ -843,10 +656,12 @@ pseudo <- RunPCA(pseudo, npcs = 7)
 
 
 p <- DimPlot(pseudo, reduction = "pca",
-             cols = c("#FBA91A", "#FBA91A", "#FBA91A","#800080", "#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49"),
-             label = T, repel = T, pt.size = 4)
+             cols = c("#E496EF","#800080", "#800080",
+                      "#00E5FF", "#A5DB6B", "#0B62AF", "#0B62AF", "#2C6E49", "#55E67E",
+                      "#FBA91A", "#FBA91A", "#FBA91A"),
+             label = T, repel = T, pt.size = 4) + NoLegend()
 
-SaveFigure(p, "psuedobulk_PCA", width = 5, height = 3)
+SaveFigure(p, "psuedobulk_PCA", width = 5, height = 5)
 ```
 
 <https://github.com/dpcook/code_snippets/blob/main/20210511_umap_sample_density/umap_sample_density.md>
@@ -867,7 +682,7 @@ density_plot <- ggplot(dat, aes(x=UMAP1, y=UMAP2)) +
   scale_fill_gradientn(colours=viridisLite::mako(100), name="Density") +
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +
-  facet_wrap(~Sample, nrow=2, ncol=4) +
+  facet_wrap(~Sample, nrow=3, ncol=4) +
   theme_classic() +
   theme(strip.background = element_blank(),
         strip.text = element_text(size=12, color="black"),
@@ -887,67 +702,6 @@ ggsave(density_plot,
        width=12, height=8)
 ```
 
-umaps by sample
-
-```{r}
-so_dev1d <- subset(x = so_filtered_medium, orig.ident %in% c("dev1d_1", "dev1d_2", "dev1d_3"))
-so_dia1d <- subset(x = so_filtered_medium, orig.ident %in% c("dia1d_1"))
-so_dia2d <- subset(x = so_filtered_medium, orig.ident %in% c("dia2d_1"))
-so_dia6d <- subset(x = so_filtered_medium, orig.ident %in% c("dia6d_1", "dia6d_2"))
-so_hb <- subset(x = so_filtered_medium, orig.ident %in% c("hb_1"))
-```
-
-```{r}
-so_dev1d <- runSeuratRNAProcessing(so_dev1d)
-so_dia1d <- runSeuratRNAProcessing(so_dia1d)
-so_dia2d <- runSeuratRNAProcessing(so_dia2d)
-so_dia6d <- runSeuratRNAProcessing(so_dia6d)
-so_hb <- runSeuratRNAProcessing(so_hb)
-
-```
-
-```{r}
-p1 <- DimPlot(so_dev1d) + ggtitle("dev1d")
-p2 <- DimPlot(so_dia1d) + ggtitle("dia1d")
-p3 <- DimPlot(so_dia2d) + ggtitle("dia2d")
-p4 <- DimPlot(so_dia6d) + ggtitle("dia6d")
-p5 <- DimPlot(so_hb) + ggtitle("hb")
-
-p <- ggarrange(p1, p2, p3, p4, p5, ncol = 3, nrow = 2)
-SaveFigure(p, name = "umaps_bysample", width = 15, height = 10)
-```
-
-```{r}
-so_dia <- subset(x = so_filtered_medium,
-                 orig.ident %in% c("dia1d_1", "dia2d_1", "dia6d_1", "dia6d_1"))
-
-so_1d <- subset(x = so_filtered_medium,
-                 orig.ident %in% c("dia1d_1", "dev1d_1", "dev1d_2", "dev1d_3"))
-
-so_1d_hb <- subset(x = so_filtered_medium,
-                 orig.ident %in% c("dia1d_1", "dev1d_1",
-                                   "dev1d_2", "dev1d_3", "hb_1"))
-
-```
-
-```{r}
-so_dia <- runSeuratRNAProcessing(so_dia)
-so_1d <- runSeuratRNAProcessing(so_1d)
-so_1d_hb <- runSeuratRNAProcessing(so_1d_hb)
-```
-
-```{r}
-p1 <- DimPlot(so_dia, group.by = "orig.ident", cols = c("#A8D5BA", "#7FC7B9", "#2C6E49", "#2C6E49")) + 
-  ggtitle("all diapause samples")
-p2 <- DimPlot(so_1d, group.by = "orig.ident", cols = c("#FBA91A", "#FBA91A", "#FBA91A", "#A8D5BA")) + 
-  ggtitle("dia1d and dev1d",)
-p3 <- DimPlot(so_1d_hb, group.by = "orig.ident", cols = c("#FBA91A", "#FBA91A", "#FBA91A","#800080", "#A8D5BA")) +
-  ggtitle("hb, dia1d, and dev1d")
-
-p <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
-SaveFigure(p, name = "umaps_bysample_combination", width = 15, height = 5)
-```
-
 Make UMAPs for all possible combinations of timepoints
 
 ```{r}
@@ -957,20 +711,20 @@ meta <- meta %>% separate_wider_delim(orig.ident, delim = "_",
                                       names = c("timepoint", "replicate"), cols_remove = F)
 
 
-so_filtered_medium$timepoint <- factor(meta$timepoint, levels = c("hb", "dev1d", "dia1d", "dia2d", "dia6d"))
+so_filtered_medium$timepoint <- factor(meta$timepoint, levels = c("25som", "hb", "dia1d", "dia2d",
+                                                                  "dia6d", "dia1mo", "dia3mo", "dev1d"))
 ```
 
 ```{r}
 timepoints = unique(so_filtered_medium$timepoint)
-colors = c("hb" = "#800080", "dev1d" = "#FBA91A", "dia1d" = "#A8D5BA", "dia2d" = "#3E8E7E", "dia6d" = "#23583A")
-
-for(i in 3:5){
+colors = c("25som" = "#E496EF", "hb" = "#800080", "dia1d" = "#00E5FF", "dia2d" = "#A5DB6B", "dia6d" = "#0B62AF", "dia1mo" = "#2C6E49", "dia3mo" = "#55E67E", "dev1d" = "#FBA91A")
+for(i in 2:8){
   for(set in combn(timepoints, i, simplify = F)){
     print(set)
     so_subset <- subset(so_filtered_medium,
                         timepoint %in% c(set))
     print(nrow(so_subset@meta.data))
-    
+
     so_subset <- runSeuratRNAProcessing(so_subset)
     p <- DimPlot(so_subset, group.by = "timepoint", cols = colors[set]) + ggtitle(paste(set, collapse = " + "))
     SaveFigure(p, paste0("comb_umap_", paste(set, collapse = "_")), width = 7, height = 7)
@@ -979,13 +733,7 @@ for(i in 3:5){
 ```
 
 ```{r}
-saveRDS(so_filtered_medium, paste0(outs_dir, "so_filtered_medium.rds"))
-
-# so_filtered_medium <- readRDS(paste0(outs_dir, "so_filtered_medium.rds"))
-```
-
-```{r}
-saveRDS(so_filtered, paste0(outs_dir, "/so_final_filtered.rds"))
+saveRDS(so_filtered_medium, paste0(outs_dir, "so_final_filtered.rds"))
 ```
 
 ```{r}

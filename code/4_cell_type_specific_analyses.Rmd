@@ -1,0 +1,385 @@
+---
+title: "4_cell_type_specific_analyses"
+---
+
+## Import Libraries
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(readxl)
+  library(scCustomize)
+})
+```
+
+## Helper Functions
+
+```{r}
+#translate from NCBI annotation to our annotation/an ortholog
+translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
+  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
+  
+  orthos <- orthos[!duplicated(orthos[[from]]),]
+  orthos <- orthos[!is.na(orthos[[from]]),]
+  
+  row.names(orthos) <- orthos[[from]]
+  translated <- orthos[genes,]
+  translated$genes <- genes
+  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
+  return(translated[[to]])
+}
+
+SaveFigure <- function(plots, path, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(path, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(path, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
+```
+
+## Output Directory
+
+```{r}
+outs_dir <- "../results_all/"
+```
+
+## Import Seurat Object
+
+```{r}
+so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
+
+# saveRDS(so, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
+
+```
+
+# Differential Expression and Differential Peak Testing
+
+## Compute Global and Cell Type Dia/Dev Genes
+
+Cell Types to Compare
+
+| Cluster                       | Dia \# | Dev \# | Pre Dia \# |
+|-------------------------------|--------|--------|------------|
+| Global                        | 39577  | 31131  | 19339      |
+| blood                         | 727    | 287    | 338        |
+| endothelial                   | 903    | 405    | 543        |
+| MB/HB pax2/5                  | 1340   | 945    | 614        |
+| Spinal Cord                   | 4156   | 2621   | 2475       |
+| Telencephalon                 | 1898   | 1241   | 1376       |
+| Progenitor Neuron             | 18039  | 10024  | 3933       |
+| Differentiating/Mature Neuron | 2153   | 5450   | 1049       |
+| Epidermal                     | 2504   | 1700   | 912        |
+| Hatching Gland                | 1186   | 353    | 703        |
+| Somite                        | 2800   | 3241   | 1774       |
+| Myotome/Muscle                | 1435   | 1368   | 1773       |
+
+First, we split barcodes into dia/dev for each cell type
+
+```{r}
+#Get Cell Barcodes for each group
+all_dia <- WhichCells(so, expression = devtraj == "dia")
+all_dev <- WhichCells(so, expression = devtraj != "dia")
+
+blood_dia <- WhichCells(
+  so,expression = annotation_broad == "blood" & devtraj == "dia")
+blood_dev <- WhichCells(
+  so,expression = annotation_broad == "blood" & devtraj != "dia")
+
+endothelial_dia <- WhichCells(
+  so,expression = annotation_broad == "endothelial" & devtraj == "dia")
+endothelial_dev <- WhichCells(
+  so,expression = annotation_broad == "endothelial" & devtraj != "dia")
+
+mbhb_dia <- WhichCells(
+  so,expression = annotation_broad == "midbrain_hindbrain_pax2/5_en1/2" & devtraj == "dia")
+mbhb_dev <- WhichCells(
+  so,expression = annotation_broad == "midbrain_hindbrain_pax2/5_en1/2" & devtraj != "dia")
+
+spinalcord_dia <- WhichCells(
+  so,expression = annotation_broad == "spinal_cord" & devtraj == "dia")
+spinalcord_dev <- WhichCells(
+  so,expression = annotation_broad == "spinal_cord" & devtraj != "dia")
+
+telencephalon_dia <- WhichCells(
+  so,expression = annotation_broad == "telencephalon/optic_cup" & devtraj == "dia")
+telencephalon_dev <- WhichCells(
+  so,expression = annotation_broad == "telencephalon/optic_cup" & devtraj != "dia")
+
+neuprog_dia <- WhichCells(
+  so,expression = annotation_broad == "neuron_progenitor" & devtraj == "dia")
+neuprog_dev <- WhichCells(
+  so,expression = annotation_broad == "neuron_progenitor" & devtraj != "dia")
+
+neuron_dia <- WhichCells(
+  so,expression = (annotation_broad == "differentiating_neuron" | annotation_broad == "neuron") & devtraj == "dia")
+neuron_dev <- WhichCells(
+  so,expression = (annotation_broad == "differentiating_neuron" | annotation_broad == "neuron") & devtraj != "dia")
+
+epidermal_dia <- WhichCells(
+  so,expression = annotation_broad == "epidermal" & devtraj == "dia")
+epidermal_dev <- WhichCells(
+  so,expression = annotation_broad == "epidermal" & devtraj != "dia")
+
+hatch_dia <- WhichCells(
+  so,expression = annotation_broad == "hatching_gland" & devtraj == "dia")
+hatch_dev <- WhichCells(
+  so,expression = annotation_broad == "hatching_gland" & devtraj != "dia")
+
+somite_dia <- WhichCells(
+  so,expression = annotation_broad == "somite" & devtraj == "dia")
+somite_dev <- WhichCells(
+  so,expression = annotation_broad == "somite" & devtraj != "dia")
+
+myotome_dia <- WhichCells(
+  so,expression = annotation_broad == "myotome/muscle" & devtraj == "dia")
+myotome_dev <- WhichCells(
+  so,expression = annotation_broad == "myotome/muscle" & devtraj != "dia")
+```
+
+Next, we compute DE between dia and dev for each group
+
+```{r}
+compute_DE <- function(dia, dev){
+  #compute DE genes
+  DefaultAssay(so) <- "ATAC"
+  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev, min.pct = 0.1)
+  
+  #add gene names as row, adding our annotations
+  df$gene <- rownames(df)
+  df$gene_name <- translate(df$gene)
+  df$gene_name <- paste0(df$gene," (", df$gene_name, ")")
+
+  #annotate with dia/dev up
+  df$DE <- NA
+  df$DE[df$avg_log2FC < -2 & df$p_val_adj < 0.05] <- "Dev Up"
+  df$DE[df$avg_log2FC > 2 & df$p_val_adj < 0.05] <- "Dia Up"
+  return(df)
+}
+
+global_DE <- compute_DE(all_dia, all_dev)
+blood_DE <- compute_DE(blood_dia, blood_dev)
+endothelial_DE <- compute_DE(endothelial_dia, endothelial_dev)
+mbhb_dia_DE <- compute_DE(mbhb_dia, mbhb_dev)
+spinalcord_DE <- compute_DE(spinalcord_dia, spinalcord_dev)
+telencephalon_DE <- compute_DE(telencephalon_dia, telencephalon_dev)
+neuprog_DE <- compute_DE(neuprog_dia, neuprog_dev)
+neuron_DE <- compute_DE(neuron_dia, neuron_dev)
+epidermal_DE <- compute_DE(epidermal_dia, epidermal_dev)
+hatch_DE <- compute_DE(hatch_dia, hatch_dev)
+somite_DE <- compute_DE(somite_dia, somite_dev)
+myotome_DE <- compute_DE(myotome_dia, myotome_dev)
+```
+
+```{r}
+library(UpSetR)
+upset <- list(
+  global = global_DE[global_DE$DE == "Dia Up", "gene"],
+  blood = blood_DE[blood_DE$DE == "Dia Up", "gene"],
+  endothelial = endothelial_DE[endothelial_DE$DE == "Dia Up", "gene"],
+  mbhb = mbhb_dia_DE[mbhb_dia_DE$DE == "Dia Up", "gene"],
+  telenceaphalon = telencephalon_DE[telencephalon_DE$DE == "Dia Up", "gene"],
+  neuprog = neuprog_DE[neuprog_DE$DE == "Dia Up", "gene"],
+  neuron = neuron_DE[neuron_DE$DE == "Dia Up", "gene"],
+  epidermal = epidermal_DE[epidermal_DE$DE == "Dia Up", "gene"],
+  hatchinggland = hatch_DE[hatch_DE$DE == "Dia Up", "gene"],
+  somite = somite_DE[somite_DE$DE == "Dia Up", "gene"],
+  myotome = myotome_DE[myotome_DE$DE == "Dia Up", "gene"]
+)
+
+sets_to_include <- c("global", "neuprog", "neuron",
+           "epidermal", "hatchinggland", "somite", "myotome")
+
+
+intersections = list(
+  list("neuprog"), list("neuron"), list("epidermal"),
+  list("hatchinggland"), list("somite"), list("myotome"),
+  list("blood"),
+  list("global", "neuprog", "neuron",
+       "epidermal", "hatchinggland", "somite", "myotome", "blood"),
+  list("neuprog", "neuron"),
+  list("somite", "myotome"),
+  list("epidermal", "somite", "myotome"),
+  list("epidermal", "neuprog", "neuron"),
+  list("somite", "neuprog", "neuron"),
+  list("epidermal", "neuprog", "neuron"),
+  list("global","epidermal", "neuprog", "neuron", "somite", "myotome"),
+  list("global","blood", "neuprog", "neuron", "somite", "myotome")
+)
+
+UpSetR::upset(
+  fromList(upset),
+  intersection = intersections,
+  queries = list(
+    list(query = intersects,
+         params = list("global", "neuprog", "neuron",
+                       "epidermal", "hatchinggland", "somite", "myotome", "blood"),
+         color = "blue", active = T),
+    list(query = intersects,
+         params = list("global","epidermal", "neuprog", "neuron", "somite", "myotome"),
+         color = "blue", active = T),
+    list(query = intersects,
+         params = list("global","blood", "neuprog", "neuron", "somite", "myotome"),
+         color = "blue", active = T),
+    list(query = intersects, params = list("neuprog"),
+         color = "green", active = T),
+    list(query = intersects, params = list("neuron"),
+         color = "green", active = T),
+    list(query = intersects, params = list("epidermal"),
+         color = "green", active = T),
+    list(query = intersects, params = list("hatchinggland"),
+         color = "green", active = T),
+    list(query = intersects, params = list("somite"),
+         color = "green", active = T),
+    list(query = intersects, params = list("myotome"),
+         color = "green", active = T),
+    list(query = intersects, params = list("blood"),
+         color = "green", active = T)
+  )
+)
+
+```
+
+```{r}
+# Install necessary packages if not already installed
+
+library(VennDiagram)
+library(ggplot2)
+
+celltypes <- c("global", "blood", "endothelial", "mbhb", "telencephalon", "neuprog", "neuron", "epidermal", "hatching gland", "somite", "myotome")
+
+
+# List of all sets
+gene_sets <- upset
+
+# Convert lists to sets
+gene_sets <- lapply(gene_sets, unique)
+
+# Calculate unique genes for each set and store them
+unique_genes <- lapply(seq_along(gene_sets), function(i) {
+  setdiff(gene_sets[[i]], unlist(gene_sets[-i]))
+})
+
+# Print unique genes for each set
+for (i in seq_along(unique_genes)) {
+  cat(paste0("Unique genes for set ", celltypes[i], ": "))
+  print(unique_genes[[i]])
+  cat("\n")
+}
+
+# Calculate unique genes counts for each set
+unique_genes_counts <- sapply(unique_genes, length)
+
+# Calculate genes present in at least 5 sets
+all_genes <- unique(unlist(gene_sets))
+gene_count <- table(unlist(gene_sets))
+genes_in_at_least_5_sets <- sum(gene_count >= 5)
+
+# Prepare data for bar graph
+categories <- c('At least 5 sets',
+                paste0('Unique to ', celltypes))
+counts <- c(genes_in_at_least_5_sets, unique_genes_counts)
+
+# Create a data frame for plotting
+data <- data.frame(Category = categories, Count = counts)
+
+# Plot bar graph using ggplot2
+ggplot(data, aes(x = Category, y = Count)) +
+  geom_bar(stat = 'identity', fill = 'skyblue') +
+  geom_text(aes(label = Count), vjust = -0.3, size = 5) +
+  labs(x = 'Category', y = 'Number of Genes', title = 'Gene Intersections and Unique Gene Counts') +
+  theme_minimal() + RotatedAxis()
+```
+
+## Compute Global Dia/Dev Peaks
+
+```{r}
+
+```
+
+## Compute Cell Type Dia/Dev Peaks
+
+```{r}
+compute_motif_enrichment <- function(dia, dev, master){
+  #compute DE genes
+  DefaultAssay(so) <- "ATAC"
+  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev, min.pct = 0.1)
+  
+
+  #identify upregulated diapause peaks  
+  dia.peak <- rownames(df[df$avg_log2FC > 0.5 & df$p_val_adj < 0.05,])
+  
+  #compute motif enrichment
+  enriched.motifs <- FindMotifs(
+    object = so,
+    features = dia.peak
+  )
+  return(enriched.motifs)
+}
+
+global_motifs <- compute_motif_enrichment(all_dia, all_dev)
+blood_motifs <- compute_motif_enrichment(blood_dia, blood_dev)
+endothelial_motifs <- compute_motif_enrichment(endothelial_dia, endothelial_dev)
+mbhb_dia_motifs <- compute_motif_enrichment(mbhb_dia, mbhb_dev)
+spinalcord_motifs <- compute_motif_enrichment(spinalcord_dia, spinalcord_dev)
+telencephalon_motifs <- compute_motif_enrichment(telencephalon_dia, telencephalon_dev)
+neuprog_motifs <- compute_motif_enrichment(neuprog_dia, neuprog_dev)
+neuron_motifs <- compute_motif_enrichment(neuron_dia, neuron_dev)
+epidermal_motifs <- compute_motif_enrichment(epidermal_dia, epidermal_dev)
+hatch_motifs <- compute_motif_enrichment(hatch_dia, hatch_dev)
+somite_motifs <- compute_motif_enrichment(somite_dia, somite_dev)
+myotome_motifs <- compute_motif_enrichment(myotome_dia, myotome_dev)
+
+
+##merge all into one dataframe
+
+```
+
+```{r}
+library(ComplexHeatmap)
+library(circlize) # for generating colors using colorramp2
+
+p_max <- 0.05
+hm <- motif_master %>% filter(`dia vs dev p.adjust` < p_max |
+                                `neuron dia p.adjust` < p_max | 
+                                `brain dia p.adjust` < p_max |
+                                `somite dia p.adjust` < p_max |
+                                `epidermis dia p.adjust` < p_max)
+
+enrich_cols <- c("dia vs dev fold.enrichment", "neuron dia fold.enrichment", 
+                 "brain dia fold.enrichment", "somite dia fold.enrichment", 
+                 "epidermis dia fold.enrichment")
+
+pval_cols <- sub("fold.enrichment", "p.adjust", enrich_cols)
+
+
+hm <- hm %>% mutate(
+    across(all_of(enrich_cols), 
+           ~ ifelse(get(sub("fold.enrichment", "p.adjust", cur_column())) > p_max, 0, .))
+)
+rownames(hm) <- hm$motif.name
+hm <- hm[,enrich_cols]
+hm <- hm %>% arrange(desc(across(colnames(hm))))
+
+
+ht <- Heatmap(hm,
+        cluster_columns = F,
+        cluster_rows = T,
+        row_names_gp = gpar(fontsize = 5),
+        column_labels = c("global", "neuron", "brain", "somite", "epidermis"),
+        col = colorRamp2(c(1,2), c("white", "red"))
+        )
+ht = draw(ht)
+
+o1 = row_order(ht)
+
+View(hm[o1,])
+```
