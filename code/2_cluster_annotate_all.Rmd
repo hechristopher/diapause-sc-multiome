@@ -93,22 +93,10 @@ so_earlydia <- subset(so_filtered, timepoint_group == "earlydia")
 so_middia <- subset(so_filtered,  timepoint_group == "middia")
 so_latedia <- subset(so_filtered, timepoint_group == "latedia")
 
-<<<<<<< HEAD
 saveRDS(so_predia, paste0(outs_dir, "markers_predia/so_predia.rds"))
 saveRDS(so_dev, paste0(outs_dir, "markers_dev/so_dev.rds"))
 saveRDS(so_earlydia, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
 saveRDS(so_middia, paste0(outs_dir, "markers_middia/so_middia.rds"))
-=======
-so_dev <- subset(so_filtered, timepoint == "dev1d")
-
-so_earlydia <- subset(so_filtered, timepoint == "dia1d" | timepoint == "dia2d")
-
-so_latedia <- subset(so_filtered,  timepoint == "dia6d")
-
-saveRDS(so_predia, paste0(outs_dir, "markers_predia/so_predia.rds"))
-saveRDS(so_dev, paste0(outs_dir, "markers_dev/so_dev.rds"))
-saveRDS(so_earlydia, paste0(outs_dir, "markers_earlydia/so_earlydia.rds"))
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 saveRDS(so_latedia, paste0(outs_dir, "markers_latedia/so_latedia.rds"))
 ```
 
@@ -128,39 +116,23 @@ so_latedia <- runSeuratRNAProcessing(so_latedia)
 ### umap by cluster
 
 ```{r}
-<<<<<<< HEAD
 p <- DimPlot(so_predia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
-=======
-p <- DimPlot(so_predia, label = T)
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_predia/umap_clusters"),
            height = 10, width = 10)
 
-<<<<<<< HEAD
 p <- DimPlot(so_dev, reduction = "umap", label = T, pt.size = 1) + NoLegend()
-=======
-p <- DimPlot(so_dev, label = T)
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_dev/umap_clusters"),
            height = 10, width = 10)
 
-<<<<<<< HEAD
 p <- DimPlot(so_earlydia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
-=======
-p <- DimPlot(so_earlydia, label = T)
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_earlydia/umap_clusters"),
            height = 10, width = 10)
 
-<<<<<<< HEAD
 p <- DimPlot(so_middia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
 SaveFigure(p, path = paste0(outs_dir, "markers_middia/umap_clusters"),
            height = 10, width = 10)
 
 p <- DimPlot(so_latedia, reduction = "umap", label = T, pt.size = 1) + NoLegend()
-=======
-p <- DimPlot(so_latedia, label = T)
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
 SaveFigure(p, path = paste0(outs_dir, "markers_latedia/umap_clusters"),
            height = 10, width = 10)
 ```
@@ -312,12 +284,7 @@ top_markers_earlydia <- all_markers_earlydia %>%
   arrange(rank) %>%
   select(-rank)
 
-<<<<<<< HEAD
 top_markers_middia <- all_markers_middia %>%
-=======
-
-top_markers_latedia <- all_markers_latedia %>%
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
   filter(avg_log2FC > 0.5) %>%
   group_by(cluster) %>%
   arrange(p_val_adj) %>%
@@ -352,9 +319,7 @@ write.csv(top_markers_latedia,
           paste0(outs_dir, "markers_latedia/top_markers_latedia.csv"))
 ```
 
-<<<<<<< HEAD
 ## Name clusters
-=======
 ```{r}
 cluster.ids <- c("neuroblast",
                  "spinal_cord",
