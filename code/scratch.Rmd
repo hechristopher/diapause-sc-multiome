@@ -1,7 +1,8 @@
 ---
 title: "scratch"
-output: html_notebook
+s---
 ---
+
 ```{r}
 suppressPackageStartupMessages({
   library(Seurat)
@@ -47,12 +48,12 @@ SaveFigure <- function(plots, path, type = "png", width, height, res){
 outs_dir <- "../results_scratch/"
 ```
 
-
 ```{r}
 so <- readRDS("../results_all/so_annotated_atac_processed.rds")
 ```
 
 ## Figures for Lab Meeting 1/17
+
 ```{r}
 # Pre-Filtering UMAP
 so_unfiltered <- readRDS("../results_all/so_unfiltered.rds")
@@ -74,6 +75,7 @@ p <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex",
 SaveFigure(p, paste0(outs_dir, "unfiltered_umap_doublets"), width = 10, height = 10)
 
 ```
+
 ```{r}
 p <- DimPlot(so_annotated, group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
@@ -91,6 +93,7 @@ p <- FeaturePlot(so_annotated, features = "nFeature_RNA", max.cutoff = 1000, red
 SaveFigure(p, paste0(outs_dir, "umap_nFeature_RNA"), width = 10, height = 10)
 
 ```
+
 ```{r}
 runSeuratRNAProcessing <- function(so, resolution = 0.8){
   DefaultAssay(so) <- "RNA"
@@ -130,6 +133,7 @@ p <- DimPlot(so_dia, group.by = "orig.ident",
 SaveFigure(p, paste0(outs_dir, "umap_dia"), width = 10, height = 10)
 
 ```
+
 ```{r}
 so_middia <- readRDS("../results_all/markers_middia/so_middia.rds")
 
@@ -188,6 +192,7 @@ DefaultAssay(so) <- "ATAC"
 p <- DimPlot(so, reduction = "umap_ATAC", group.by = "ATAC_snn_res.0.8", pt.size = .3)
 SaveFigure(p, paste0(outs_dir, "umap_atac_clusters"), width = 10, height = 10)
 ```
+
 ```{r}
 DefaultAssay(so) <- "RNA"
 
@@ -245,6 +250,7 @@ p <- ggplot(global_diavsdev_atac, aes(x = avg_log2FC, y = -log10(p_val_adj), col
 
 SaveFigure(p, paste0(outs_dir, "volcano_ATAC"), width = 4, height = 4)
 ```
+
 ```{r}
 top.da.peak <- rownames(global_diavsdev_atac %>% filter(DE == "Dia Up"))
 
@@ -261,6 +267,7 @@ p <- MotifPlot(
 SaveFigure(p, paste0(outs_dir, "motifs_dia"), width = 6, height = 4)
 
 ```
+
 ```{r}
 DefaultAssay(so) <- "RNA"
 
@@ -279,6 +286,7 @@ p <- DimPlot(pseudo, reduction = "pca",
 
 SaveFigure(p, paste0(outs_dir, "pseudobulk_pca"), width = 5, height = 5)
 ```
+
 ```{r}
 DefaultAssay(so) <- "RNA"
 so$devtraj <- factor(so$devtraj, levels = c("pre-dia", "dev", "dia"))
@@ -306,3 +314,32 @@ SaveFigure(p, paste0(outs_dir, "LOC107372894_vln"), width = 5, height = 5)
 
 ```
 
+```{r}
+bulk <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\diapause-sc-multiome\\bulk\\1Diapause_RNA-seq_with_human_symbol_CK.xlsx")
+
+rownames(bulk) <- bulk$genes
+
+hm <- as.matrix(bulk[c("LOC107373895", top_dia$gene), c(21, 22, 23, 24, 25)])
+rownames(hm) <- c("LOC107373895", top_dia$gene)
+
+
+row_normalize <- function(m) {
+  t(apply(m, 1, function(row) {
+    (row - mean(row)) / sd(row)
+  }))
+}
+
+# Apply the row normalization function to the matrix
+hm <- row_normalize(hm)
+
+# Print the normalized matrix
+
+ht <- Heatmap(hm,
+        cluster_columns = F,
+        cluster_rows = F,
+        row_names_gp = gpar(fontsize = 5)
+)
+
+SaveFigure(ht, paste0(outs_dir, "figures/heatmap_diaup_bulk"), height = 10, width = 10)
+
+```

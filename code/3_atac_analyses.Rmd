@@ -190,7 +190,7 @@ colors <- sortByHue(colors)
 names(colors) <- levels(so_annotated$annotation_broad)
 swatch(colors)
 
-saveRDS(colors, paste0(outs_dir, "/colors_annotation_broad"))
+saveRDS(colors, paste0(outs_dir, "/colors_annotation_broad.rds"))
 
 
 p <- linkage_heatmap(so_annotated, link$gene, link$peak, unlist(split))

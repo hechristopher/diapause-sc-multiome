@@ -150,7 +150,7 @@ Next, we compute DE between dia and dev for each group
 ```{r}
 compute_DE <- function(dia, dev){
   #compute DE genes
-  DefaultAssay(so) <- "ATAC"
+  DefaultAssay(so) <- "RNA"
   df <- FindMarkers(so, ident.1 = dia, ident.2 = dev, min.pct = 0.1)
   
   #add gene names as row, adding our annotations
@@ -168,7 +168,7 @@ compute_DE <- function(dia, dev){
 global_DE <- compute_DE(all_dia, all_dev)
 blood_DE <- compute_DE(blood_dia, blood_dev)
 endothelial_DE <- compute_DE(endothelial_dia, endothelial_dev)
-mbhb_dia_DE <- compute_DE(mbhb_dia, mbhb_dev)
+mbhb_DE <- compute_DE(mbhb_dia, mbhb_dev)
 spinalcord_DE <- compute_DE(spinalcord_dia, spinalcord_dev)
 telencephalon_DE <- compute_DE(telencephalon_dia, telencephalon_dev)
 neuprog_DE <- compute_DE(neuprog_dia, neuprog_dev)
@@ -185,7 +185,7 @@ upset <- list(
   global = global_DE[global_DE$DE == "Dia Up", "gene"],
   blood = blood_DE[blood_DE$DE == "Dia Up", "gene"],
   endothelial = endothelial_DE[endothelial_DE$DE == "Dia Up", "gene"],
-  mbhb = mbhb_dia_DE[mbhb_dia_DE$DE == "Dia Up", "gene"],
+  mbhb = mbhb_DE[mbhb_dia_DE$DE == "Dia Up", "gene"],
   telenceaphalon = telencephalon_DE[telencephalon_DE$DE == "Dia Up", "gene"],
   neuprog = neuprog_DE[neuprog_DE$DE == "Dia Up", "gene"],
   neuron = neuron_DE[neuron_DE$DE == "Dia Up", "gene"],
@@ -299,19 +299,53 @@ ggplot(data, aes(x = Category, y = Count)) +
   theme_minimal() + RotatedAxis()
 ```
 
-## Compute Global Dia/Dev Peaks
+## Comparing diapause timepoints
 
 ```{r}
 
+DefaultAssay(so) <- "RNA"
+Idents(so) <- "timepoint_group"
+
+
+
+
+#early vs mid
+early_vs_mid <- FindMarkers(so, ident.1 = "middia", ident.2 = "earlydia")
+
+#early vs late
+early_vs_late <- FindMarkers(so, ident.1 = "latedia", ident.2 = "earlydia")
+
+#mid vs late
+mid_vs_late <- FindMarkers(so, ident.1 = "latedia", ident.2 = "middia")
+
+#TODO: try pseudobulk
+pseudo <- AggregateExpression(so, assays = "RNA", return.seurat = T, group.by = "timepoint_group")
+pseudo <- NormalizeData(pseudo)
+pseudo <- FindVariableFeatures(pseudo)
+I
+p <- DoHeatmap(pseudo, slot = "data", features = top_dia$gene)
+SaveFigure(p, paste0(outs_dir, "figures/heatmap_diaup_pseudo"), height = 10, width = 10)
+
+
+DotPlot(so, features = top_dia$gene)
+
+#make heatmap with different columns
+
+top_dia <- global_DE %>% filter(DE == "Dia Up")
+p <- DoHeatmap(so, group.by = "timepoint_group", slot = "data", disp.max = 4,  features = top_dia$gene)
+SaveFigure(p, paste0(outs_dir, "figures/heatmap_diaup"), height = 10, width = 10)
+
+FeaturePlot(so, c("LOC107373896", "LOC107373895"), reduction = "umap")
+
 ```
 
-## Compute Cell Type Dia/Dev Peaks
+## Compute Global and Cell Type Dia/Dev Peaks
 
 ```{r}
 compute_motif_enrichment <- function(dia, dev, master){
   #compute DE genes
   DefaultAssay(so) <- "ATAC"
-  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev, min.pct = 0.1)
+  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev)
   
 
   #identify upregulated diapause peaks  
@@ -328,7 +362,7 @@ compute_motif_enrichment <- function(dia, dev, master){
 global_motifs <- compute_motif_enrichment(all_dia, all_dev)
 blood_motifs <- compute_motif_enrichment(blood_dia, blood_dev)
 endothelial_motifs <- compute_motif_enrichment(endothelial_dia, endothelial_dev)
-mbhb_dia_motifs <- compute_motif_enrichment(mbhb_dia, mbhb_dev)
+mbhb_motifs <- compute_motif_enrichment(mbhb_dia, mbhb_dev)
 spinalcord_motifs <- compute_motif_enrichment(spinalcord_dia, spinalcord_dev)
 telencephalon_motifs <- compute_motif_enrichment(telencephalon_dia, telencephalon_dev)
 neuprog_motifs <- compute_motif_enrichment(neuprog_dia, neuprog_dev)
@@ -340,46 +374,83 @@ myotome_motifs <- compute_motif_enrichment(myotome_dia, myotome_dev)
 
 
 ##merge all into one dataframe
+ct_motif_enrichment <- list(global_motifs,
+                            blood_motifs,
+                            endothelial_motifs,
+                            mbhb_dia_motifs,
+                            spinalcord_motifs,
+                            telencephalon_motifs,
+                            neuprog_motifs,
+                            neuron_motifs,
+                            epidermal_motifs,
+                            hatch_motifs,
+                            somite_motifs,
+                            myotome_motifs)
 
+names <- list('global',
+              'blood',
+              'endothelial',
+              'mbhb',
+              'spinalcord',
+              'telencephalon',
+              'neuprog',
+              'neuron',
+              'epidermal',
+              'hatch',
+              'somite',
+              'myotome')
+
+create_enrichment_matrix <- function(dataframes, names, p_max = 0.05) {
+  # Create an empty list to store the filtered dataframes
+  filtered_dataframes <- list()
+  
+  # Process each dataframe
+  for (i in seq_along(dataframes)) {
+    df_filtered <- dataframes[[i]] %>%
+      filter(p.adjust < p_max) %>%
+      select(motif.name, fold.enrichment) %>%
+      mutate(df = names[i])
+    filtered_dataframes[[i]] <- df_filtered
+  }
+  
+  # Combine all filtered dataframes into one
+  combined_df <- bind_rows(filtered_dataframes)
+  
+  # Spread the data into a wide format
+  heatmap_df <- combined_df %>%
+    spread(key = df, value = fold.enrichment)
+  
+  # Convert to a matrix
+  heatmap_matrix <- as.matrix(heatmap_df %>%
+    column_to_rownames("motif.name"))
+  
+  # Replace NA with 0
+  heatmap_matrix[is.na(heatmap_matrix)] <- 0
+  
+  return(heatmap_matrix)
+}
+
+hm <- create_enrichment_matrix(ct_motif_enrichment, names, p_max = 0.05)
 ```
 
 ```{r}
 library(ComplexHeatmap)
 library(circlize) # for generating colors using colorramp2
 
-p_max <- 0.05
-hm <- motif_master %>% filter(`dia vs dev p.adjust` < p_max |
-                                `neuron dia p.adjust` < p_max | 
-                                `brain dia p.adjust` < p_max |
-                                `somite dia p.adjust` < p_max |
-                                `epidermis dia p.adjust` < p_max)
-
-enrich_cols <- c("dia vs dev fold.enrichment", "neuron dia fold.enrichment", 
-                 "brain dia fold.enrichment", "somite dia fold.enrichment", 
-                 "epidermis dia fold.enrichment")
-
-pval_cols <- sub("fold.enrichment", "p.adjust", enrich_cols)
-
-
-hm <- hm %>% mutate(
-    across(all_of(enrich_cols), 
-           ~ ifelse(get(sub("fold.enrichment", "p.adjust", cur_column())) > p_max, 0, .))
-)
-rownames(hm) <- hm$motif.name
-hm <- hm[,enrich_cols]
-hm <- hm %>% arrange(desc(across(colnames(hm))))
-
-
 ht <- Heatmap(hm,
         cluster_columns = F,
         cluster_rows = T,
         row_names_gp = gpar(fontsize = 5),
-        column_labels = c("global", "neuron", "brain", "somite", "epidermis"),
+        column_labels = names,
         col = colorRamp2(c(1,2), c("white", "red"))
         )
 ht = draw(ht)
 
+
 o1 = row_order(ht)
 
 View(hm[o1,])
+
+SaveFigure(ht, paste0(outs_dir, "figures/cell_typte_motif_enrich"), height = 40, width = 30)
+
 ```
