@@ -50,6 +50,7 @@ outs_dir <- "../results_scratch/"
 
 ```{r}
 so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+colors <- readRDS("../results_all/colors_annotation_broad.rds")
 ```
 
 ## Figures for Lab Meeting 1/17
@@ -341,5 +342,61 @@ ht <- Heatmap(hm,
 )
 
 SaveFigure(ht, paste0(outs_dir, "figures/heatmap_diaup_bulk"), height = 10, width = 10)
+
+```
+
+cell type composition changes
+
+```{r}
+# Extract metadata
+metadata <- so@meta.data
+
+# Calculate cell counts per timepoint and cell type
+cell_counts <- metadata %>%
+  group_by(timepoint_group, annotation_broad) %>%
+  summarize(count = n()) %>%
+  ungroup()
+
+# Calculate total cells per timepoint
+total_cells <- cell_counts %>%
+  group_by(timepoint_group) %>%
+  summarize(total = sum(count))
+
+# Merge to get percentages
+cell_percentages <- cell_counts %>%
+  left_join(total_cells, by = "timepoint_group") %>%
+  mutate(percentage = (count / total) * 100)
+
+
+# Plot percentages
+percentage_plot <- ggplot(cell_percentages, aes(x = timepoint_group, y = percentage, fill = annotation_broad)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = colors) +
+  labs(x = "Timepoint Group", y = "Percentage", fill = "Cell Type") +
+  theme_minimal() +
+  ggtitle("Cell Type Composition Over Time (Percentage)")
+
+# Print the plot
+SaveFigure(percentage_plot, paste0(outs_dir, "figures/cell_type_composition_percentage"), height = 10, width = 10)
+
+# Plot total counts
+count_plot <- ggplot(cell_counts, aes(x = timepoint_group, y = count, fill = annotation_broad)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = colors) +
+  labs(x = "Timepoint Group", y = "Cell Count", fill = "Cell Type") +
+  theme_minimal() +
+  ggtitle("Cell Type Composition Over Time (Total Cell Count)")
+
+# Print the plot
+SaveFigure(count_plot, paste0(outs_dir, "figures/cell_type_composition_total"), height = 10, width = 10)
+
+```
+
+```{r}
+VlnPlot(so, features = "reps2", group.by = "timepoint_group")
+FeaturePlot(so, features = "reps2", reduction = "umap")
+
+VlnPlot(so, features = "sepp1", group.by = "timepoint_group")
+FeaturePlot(so, features = "sepp1", reduction = "umap")
 
 ```

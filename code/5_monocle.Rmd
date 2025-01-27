@@ -1,0 +1,57 @@
+---
+title: "5_monocle"
+format: html
+editor: visual
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(readxl)
+})
+```
+
+# Helper Functions
+
+```{r}
+#translate from NCBI annotation to our annotation/an ortholog
+translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
+  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
+  
+  orthos <- orthos[!duplicated(orthos[[from]]),]
+  orthos <- orthos[!is.na(orthos[[from]]),]
+  
+  row.names(orthos) <- orthos[[from]]
+  translated <- orthos[genes,]
+  translated$genes <- genes
+  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
+  return(translated[[to]])
+}
+
+SaveFigure <- function(plots, path, type = "png", width, height, res){
+  if(type == "png") {
+    png(paste0(path, ".", type),
+      width = width, height = height, units = "in", res = 200)
+  } else {
+    pdf(paste0(path, ".", type),
+      width = width, height = height)
+  }
+  print(plots)
+  dev.off()
+  print(plots)
+}
+```
+
+## Set Output Directory
+
+```{r}
+outs_dir <- "../results_all/"
+```
+
+```{r}
+so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
+```
+
