@@ -400,3 +400,10 @@ VlnPlot(so, features = "sepp1", group.by = "timepoint_group")
 FeaturePlot(so, features = "sepp1", reduction = "umap")
 
 ```
+
+```{r}
+annotations <- so_annotated@meta.data[, c("annotation_grouped", "annotation_merged", "annotation_broad")]
+
+
+write.csv(annotations, paste0(outs_dir, "annotations.csv"))
+```

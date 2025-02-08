@@ -305,21 +305,34 @@ write.csv(all_peaks, paste0(outs_dir, "/master_peaks.csv"), na = "")
 ```{r}
 
 #NOTE: enriched motifs depends on fold change cutoff
-top.da.peak <- rownames(da_dia_dev[da_dia_dev$p_val_adj < 0.05 & da_dia_dev$avg_log2FC > 0.5, ])
+top.dia.peak <- rownames(da_dia_dev[da_dia_dev$p_val_adj < 0.05 & da_dia_dev$avg_log2FC > 0.5, ])
+top.dev.peak <- rownames(da_dia_dev[da_dia_dev$p_val_adj < 0.05 & da_dia_dev$avg_log2FC < -0.5, ])
 
-enriched.motifs <- FindMotifs(
+dia.enriched.motifs <- FindMotifs(
   object = so_annotated,
-  features = top.da.peak
+  features = top.dia.peak
+)
+dev.enriched.motifs <- FindMotifs(
+  object = so_annotated,
+  features = top.dev.peak
 )
 
 MotifPlot(
   object = so_annotated,
-  motifs = head(rownames(enriched.motifs))
+  motifs = head(rownames(dia.enriched.motifs))
+)
+MotifPlot(
+  object = so_annotated,
+  motifs = head(rownames(dev.enriched.motifs))
 )
 
-enriched.motifs <- enriched.motifs[,c(8,4,5,6,9)]
 
-colnames(enriched.motifs)[-1] <- paste0("dia vs dev ", colnames(enriched.motifs)[-1])
+dia.enriched.motifs <- dia.enriched.motifs[,c(8,4,5,6,9)]
+dev.enriched.motifs <- dev.enriched.motifs[,c(8,4,5,6,9)]
+
+
+colnames(dia.enriched.motifs)[-1] <- paste0("dia.", colnames(dia.enriched.motifs)[-1])
+colnames(dev.enriched.motifs)[-1] <- paste0("dev.", colnames(dev.enriched.motifs)[-1])
 ```
 
 Differential Motif Activity
@@ -337,13 +350,19 @@ diff.motifs <- FindMarkers(
 colnames(diff.motifs) <- paste0("motif_activity_", colnames(diff.motifs))
 diff.motifs$motif_activity_dia_vs_dev <- ifelse(diff.motifs$motif_activity_avg_log2FC > 0, "Dia.up", "Dev.up")
 diff.motifs <- diff.motifs[abs(diff.motifs$motif_activity_avg_log2FC) > 1.5 & diff.motifs$motif_activity_p_val_adj < 0.05, c(6,2,3,4,5)]
+```
 
+Master motif list
 
-motif_master <- merge(enriched.motifs, diff.motifs, by = "row.names", all = T)
+```{r}
+motif_master <- merge(dia.enriched.motifs,dev.enriched.motifs, by = "row.names", all = T)
+rownames(motif_master) <- motif_master$Row.names
+motif_master <- motif_master[,-1]
+motif_master <- merge(motif_master,diff.motifs, by = "row.names", all = T)
 rownames(motif_master) <- motif_master$Row.names
 motif_master <- motif_master[,-1]
 ```
 
 ```{r}
-write.csv(motif_master, paste0(outs_dir, "/master_motifs.csv"), na = "")
+write.csv(motif_master, paste0(outs_dir, "master_motifs.csv"), na = "")
 ```
