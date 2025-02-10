@@ -7,16 +7,19 @@ editor: visual
 ## Load Libraries
 
 ```{r}
-library(SoupX)
-library(Seurat)
-library(DropletUtils)
-library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
-library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-library(Signac)
-library(tidyverse)
-library(dplyr)
-library(DoubletFinder)
-library(scDblFinder)
+suppressPackageStartupMessages({
+  library(SoupX)
+  library(Seurat)
+  library(DropletUtils)
+  library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(BSgenome.Nfurzeri.NCBI.NfurGRZ.RIMD1)
+  library(Signac)
+  library(tidyverse)
+  library(dplyr)
+  library(DoubletFinder)
+  library(scDblFinder)
+})
 
 ```
 
@@ -36,13 +39,27 @@ use relative paths
 
 
 # all aggregated
-filtered_path <- "../aggr_batch1-3/filtered_feature_bc_matrix.h5"
-raw_path <- "../aggr_batch1-3/raw_feature_bc_matrix.h5"
-fragments_path <- "../aggr_batch1-3/atac_fragments.tsv.gz"
-annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
+# filtered_path <- "../aggr_batch1-3/filtered_feature_bc_matrix.h5"
+# raw_path <- "../aggr_batch1-3/raw_feature_bc_matrix.h5"
+# fragments_path <- "../aggr_batch1-3/atac_fragments.tsv.gz"
+# annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
+# 
+# outs_dir <- "../results_all/"
+# fig_path <- "../results_all/figures/"
+# 
+# 
+# #add sample names here in order of aggr library file
+# sample_names <- c("25som_1", "hb_1", "hb_2", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2", "dia1mo_1", "dia3mo_1", "dev1d_1", "dev1d_2", "dev1d_3")
 
-outs_dir <- "../results_all/"
-fig_path <- "../results_all/figures/"
+
+# all aggregated rimd1
+filtered_path <- "../rimd1/filtered_feature_bc_matrix.h5"
+raw_path <- "../rimd1/raw_feature_bc_matrix.h5"
+fragments_path <- "../rimd1/atac_fragments.tsv.gz"
+annotation_path <- "../rimd1/GCF_043380555.1_NfurGRZ-RIMD1_genomic_edited.gtf"
+
+outs_dir <- "../results_rimd1/"
+fig_path <- "../results_rimd1/figures/"
 
 
 #add sample names here in order of aggr library file

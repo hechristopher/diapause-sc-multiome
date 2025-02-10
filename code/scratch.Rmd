@@ -1,6 +1,5 @@
 ---
 title: "scratch"
-s---
 ---
 
 ```{r}
@@ -406,4 +405,10 @@ annotations <- so_annotated@meta.data[, c("annotation_grouped", "annotation_merg
 
 
 write.csv(annotations, paste0(outs_dir, "annotations.csv"))
+```
+
+```{r}
+DefaultAssay(so_annotated) <- "RNA"
+
+FeaturePlot(so_annotated, "hnf1b")
 ```
