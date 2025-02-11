@@ -377,7 +377,7 @@ myotome_motifs <- compute_motif_enrichment(myotome_dia, myotome_dev)
 ct_motif_enrichment <- list(global_motifs,
                             blood_motifs,
                             endothelial_motifs,
-                            mbhb_dia_motifs,
+                            mbhb_motifs,
                             spinalcord_motifs,
                             telencephalon_motifs,
                             neuprog_motifs,
