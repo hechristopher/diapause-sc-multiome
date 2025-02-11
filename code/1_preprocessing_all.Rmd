@@ -10,14 +10,12 @@ editor: visual
 suppressPackageStartupMessages({
   library(SoupX)
   library(Seurat)
-  library(DropletUtils)
   library(BSgenome.Nfurzeri.NCBI.UINfuzMZM1.0.custom)
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(BSgenome.Nfurzeri.NCBI.NfurGRZ.RIMD1)
   library(Signac)
   library(tidyverse)
   library(dplyr)
-  library(DoubletFinder)
   library(scDblFinder)
 })
 
