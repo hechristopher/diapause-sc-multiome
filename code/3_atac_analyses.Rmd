@@ -246,7 +246,7 @@ linkage_heatmap <- function(seu, genes, peaks, cells, cluster_rows = F){
 
 # Peak Master List
 
-Create Peak Master List
+Create Peak Master List with closest gene to each peak
 
 ```{r}
 DefaultAssay(so_annotated) <- "ATAC"
@@ -256,7 +256,63 @@ rownames(all_peaks) <- rownames(so_annotated[["ATAC"]])
 closest_genes <- ClosestFeature(so_annotated, regions = rownames(all_peaks))
 rownames(closest_genes) <- closest_genes$query_region
 
-all_peaks <- merge(all_peaks, closest_genes[,c("gene_name", "distance")], by = "row.names")
+```
+
+Add peak annotations (exon vs promoter vs intron vs intergenic)
+```{r}
+gtf <- rtracklayer::import("../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf")
+gtf_df <- data.frame(gtf)
+
+DefaultAssay(so) <- "ATAC"
+
+
+#annotate peaks if they are in exons, promoters, introns, or 
+peak_annotation <- rep('NA', nrow(closest_genes))
+for (i in 1:nrow(closest_genes)) {
+  # Access each row with closest_genes[i, ]
+  peak_start <- as.numeric(strsplit(closest_genes[i,"query_region"], "-")[[1]][2])
+  peak_end <- as.numeric(strsplit(closest_genes[i,"query_region"], "-")[[1]][3])
+  
+  promoter_start <- -1
+  promoter_end <- -1
+  
+  gene <- closest_genes[i,"gene_id"]
+  
+  gene_details <- gtf_df %>% filter(gene_id == !!gene & type == 'gene')
+  if(gene_details$strand == '-'){
+    promoter_start <- gene_details$end + 2000
+    promoter_end <- gene_details$end - 100
+  } else{
+    promoter_start <- gene_details$start - 2000
+    promoter_end <- gene_details$start + 100
+  }
+  
+  # Find the minimum and maximum of each pair of coordinates
+  min_peak <- min(peak_start, peak_end)
+  max_peak <- max(peak_start, peak_end)
+  min_promoter <- min(promoter_start, promoter_end)
+  max_promoter <- max(promoter_start, promoter_end)
+  min_gene <- min(gene_details$start, gene_details$end)
+  max_gene <- max(gene_details$start, gene_details$end)
+
+  
+  if(max_peak >= min_promoter && max_promoter >= min_peak){
+    peak_annotation[i] <- 'promoter'
+  } else if((closest_genes[i,"type"] == "exon" | closest_genes[i,"type"] == "CDS") & closest_genes[i,"distance"] == 0){
+    peak_annotation[i] <- 'exon'
+  } else if(max_peak >= min_gene && max_gene >= min_peak){
+    peak_annotation[i] <- 'intron'
+  } else{
+    peak_annotation[i] <- 'intergenic'
+  }
+  if (i%%1000 == 0){
+    print(i)
+  }
+}
+
+closest_genes$peak_annotation <- peak_annotation
+
+all_peaks <- merge(all_peaks, closest_genes[,c("gene_name", "distance", "peak_annotation")], by = "row.names")
 all_peaks <- data.frame(all_peaks, row.names = 1)
 ```
 
@@ -296,11 +352,33 @@ all_peaks <- data.frame(all_peaks, row.names = 1)
 
 ```
 
+Motif Matrix
+```{r}
+library(JASPAR2020)
+library(TFBSTools)
+pfm <- getMatrixSet(
+  x = JASPAR2020,
+  opts = list(collection = "CORE", tax_group = 'vertebrates', all_versions = FALSE)
+)
+
+motif.matrix <- CreateMotifMatrix(
+  features = granges(so_annotated[["ATAC"]]),
+  pwm = pfm,
+  genome = BSgenome.Nfurzeri.NCBI.Nfu20140520.custom
+)
+
+all_peaks <- merge(all_peaks, motif.matrix, by = "row.names", all = T)
+
+```
+
+
+
+
 ```{r}
 write.csv(all_peaks, paste0(outs_dir, "/master_peaks.csv"), na = "")
 ```
 
-## Motif Master List
+# Motif Master List
 
 ```{r}
 

@@ -86,6 +86,75 @@
       "Repository": "Bioconductor 3.20",
       "NeedsCompilation": "no"
     },
+    "AnnotationHub": {
+      "Package": "AnnotationHub",
+      "Version": "3.14.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Client to access AnnotationHub resources",
+      "Authors@R": "c(person(\"Bioconductor Package\", \"Maintainer\", email=\"maintainer@bioconductor.org\", role=\"cre\"), person(\"Martin\", \"Morgan\", role=\"aut\"), person(\"Marc\", \"Carlson\", role=\"ctb\"), person(\"Dan\", \"Tenenbaum\", role=\"ctb\"), person(\"Sonali\", \"Arora\", role=\"ctb\"), person(\"Valerie\", \"Oberchain\", role=\"ctb\"), person(\"Kayla\", \"Morrell\", role=\"ctb\"), person(\"Lori\", \"Shepherd\", role=\"aut\"))",
+      "biocViews": "Infrastructure, DataImport, GUI, ThirdPartyClient",
+      "Description": "This package provides a client for the Bioconductor AnnotationHub web resource. The AnnotationHub web resource provides a central location where genomic files (e.g., VCF, bed, wig) and other resources from standard locations (e.g., UCSC, Ensembl) can be discovered. The resource includes metadata about each resource, e.g., a textual description, tags, and date of modification. The client creates and manages a local cache of files retrieved by the user, helping with quick and reproducible access.",
+      "License": "Artistic-2.0",
+      "Depends": [
+        "BiocGenerics (>= 0.15.10)",
+        "BiocFileCache (>= 1.5.1)"
+      ],
+      "Imports": [
+        "utils",
+        "methods",
+        "grDevices",
+        "RSQLite",
+        "BiocManager",
+        "BiocVersion",
+        "curl",
+        "rappdirs",
+        "AnnotationDbi (>= 1.31.19)",
+        "S4Vectors",
+        "httr",
+        "yaml",
+        "dplyr"
+      ],
+      "Suggests": [
+        "IRanges",
+        "GenomicRanges",
+        "GenomeInfoDb",
+        "VariantAnnotation",
+        "Rsamtools",
+        "rtracklayer",
+        "BiocStyle",
+        "knitr",
+        "AnnotationForge",
+        "rBiopaxParser",
+        "RUnit",
+        "txdbmaker",
+        "MSnbase",
+        "mzR",
+        "Biostrings",
+        "CompoundDb",
+        "keras",
+        "ensembldb",
+        "SummarizedExperiment",
+        "ExperimentHub",
+        "gdsfmt",
+        "rmarkdown",
+        "HubPub"
+      ],
+      "Enhances": [
+        "AnnotationHubData"
+      ],
+      "Collate": "AnnotationHubOption.R AllGenerics.R Hub-class.R db-utils.R AnnotationHub-class.R AnnotationHubResource-class.R BEDResource-class.R ProteomicsResource-class.R EpigenomeResource-class.R EnsDbResource-class.R utilities.R sql-utils.R Hub-utils.R cache-utils.R zzz.R",
+      "VignetteBuilder": "knitr",
+      "BugReports": "https://github.com/Bioconductor/AnnotationHub/issues",
+      "NeedsCompilation": "yes",
+      "git_url": "https://git.bioconductor.org/packages/AnnotationHub",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "f93a396",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "Author": "Bioconductor Package Maintainer [cre], Martin Morgan [aut], Marc Carlson [ctb], Dan Tenenbaum [ctb], Sonali Arora [ctb], Valerie Oberchain [ctb], Kayla Morrell [ctb], Lori Shepherd [aut]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
     "BH": {
       "Package": "BH",
       "Version": "1.87.0-1",
@@ -275,6 +344,51 @@
       "NeedsCompilation": "yes",
       "Author": "R. Gentleman [aut], V. Carey [aut], M. Morgan [aut], S. Falcon [aut], Haleema Khan [ctb] ('esApply' and 'BiobaseDevelopment' vignette translation from Sweave to Rmarkdown / HTML), Bioconductor Package Maintainer [cre]",
       "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
+    "BiocFileCache": {
+      "Package": "BiocFileCache",
+      "Version": "2.14.0",
+      "Source": "Bioconductor",
+      "Title": "Manage Files Across Sessions",
+      "Authors@R": "c(person(\"Lori\", \"Shepherd\", email = \"lori.shepherd@roswellpark.org\", role = c(\"aut\", \"cre\")), person(\"Martin\", \"Morgan\", email = \"martin.morgan@roswellpark.org\", role = \"aut\"))",
+      "Description": "This package creates a persistent on-disk cache of files that the user can add, update, and retrieve. It is useful for managing resources (such as custom Txdb objects) that are costly or difficult to create, web resources, and data files used across sessions.",
+      "Depends": [
+        "R (>= 3.4.0)",
+        "dbplyr (>= 1.0.0)"
+      ],
+      "Imports": [
+        "methods",
+        "stats",
+        "utils",
+        "dplyr",
+        "RSQLite",
+        "DBI",
+        "filelock",
+        "curl",
+        "httr"
+      ],
+      "BugReports": "https://github.com/Bioconductor/BiocFileCache/issues",
+      "DevelopmentURL": "https://github.com/Bioconductor/BiocFileCache",
+      "License": "Artistic-2.0",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.2.3",
+      "biocViews": "DataImport",
+      "VignetteBuilder": "knitr",
+      "Suggests": [
+        "testthat",
+        "knitr",
+        "BiocStyle",
+        "rmarkdown",
+        "rtracklayer"
+      ],
+      "git_url": "https://git.bioconductor.org/packages/BiocFileCache",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "66862c5",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "Lori Shepherd [aut, cre], Martin Morgan [aut]",
+      "Maintainer": "Lori Shepherd <lori.shepherd@roswellpark.org>"
     },
     "BiocGenerics": {
       "Package": "BiocGenerics",
@@ -1221,6 +1335,74 @@
       "Author": "Hervé Pagès [aut, cre], Valerie Obenchain [aut], Martin Morgan [aut], Fedor Bezrukov [ctb], Robert Castelo [ctb], Halimat C. Atanda [ctb] (Translated 'WorkingWithAlignedNucleotides' vignette from Sweave to RMarkdown / HTML.)",
       "Maintainer": "Hervé Pagès <hpages.on.github@gmail.com>"
     },
+    "GenomicFeatures": {
+      "Package": "GenomicFeatures",
+      "Version": "1.58.0",
+      "Source": "Bioconductor",
+      "Title": "Query the gene models of a given organism/assembly",
+      "Description": "Extract the genomic locations of genes, transcripts, exons, introns, and CDS, for the gene models stored in a TxDb object. A TxDb object is a small database that contains the gene models of a given organism/assembly. Bioconductor provides a small collection of TxDb objects in the form of ready-to-install TxDb packages for the most commonly studied organisms. Additionally, the user can easily make a TxDb object (or package) for the organism/assembly of their choice by using the tools from the txdbmaker package.",
+      "biocViews": "Genetics, Infrastructure, Annotation, Sequencing, GenomeAnnotation",
+      "URL": "https://bioconductor.org/packages/GenomicFeatures",
+      "BugReports": "https://github.com/Bioconductor/GenomicFeatures/issues",
+      "License": "Artistic-2.0",
+      "Encoding": "UTF-8",
+      "Authors@R": "c( person(\"M.\", \"Carlson\", role=\"aut\"), person(\"H.\", \"Pagès\", role=c(\"aut\", \"cre\"), email=\"hpages.on.github@gmail.com\"), person(\"P.\", \"Aboyoun\", role=\"aut\"), person(\"S.\", \"Falcon\", role=\"aut\"), person(\"M.\", \"Morgan\", role=\"aut\"), person(\"D.\", \"Sarkar\", role=\"aut\"), person(\"M.\", \"Lawrence\", role=\"aut\"), person(\"V.\", \"Obenchain\", role=\"aut\"), person(\"S.\", \"Arora\", role=\"ctb\"), person(\"J.\", \"MacDonald\", role=\"ctb\"), person(\"M.\", \"Ramos\", role=\"ctb\"), person(\"S.\", \"Saini\", role=\"ctb\"), person(\"P.\", \"Shannon\", role=\"ctb\"), person(\"L.\", \"Shepherd\", role=\"ctb\"), person(\"D.\", \"Tenenbaum\", role=\"ctb\"), person(\"D.\", \"Van Twisk\", role=\"ctb\"))",
+      "Depends": [
+        "R (>= 3.5.0)",
+        "BiocGenerics (>= 0.51.2)",
+        "S4Vectors (>= 0.17.29)",
+        "IRanges (>= 2.37.1)",
+        "GenomeInfoDb (>= 1.35.8)",
+        "GenomicRanges (>= 1.55.2)",
+        "AnnotationDbi (>= 1.41.4)"
+      ],
+      "Imports": [
+        "methods",
+        "utils",
+        "stats",
+        "DBI",
+        "XVector",
+        "Biostrings",
+        "rtracklayer"
+      ],
+      "Suggests": [
+        "txdbmaker",
+        "org.Mm.eg.db",
+        "org.Hs.eg.db",
+        "BSgenome",
+        "BSgenome.Hsapiens.UCSC.hg19 (>= 1.3.17)",
+        "BSgenome.Celegans.UCSC.ce11",
+        "BSgenome.Dmelanogaster.UCSC.dm3 (>= 1.3.17)",
+        "mirbase.db",
+        "FDb.UCSC.tRNAs",
+        "TxDb.Hsapiens.UCSC.hg19.knownGene",
+        "TxDb.Celegans.UCSC.ce11.ensGene",
+        "TxDb.Dmelanogaster.UCSC.dm3.ensGene (>= 2.7.1)",
+        "TxDb.Mmusculus.UCSC.mm10.knownGene (>= 3.4.7)",
+        "TxDb.Hsapiens.UCSC.hg19.lincRNAsTranscripts",
+        "TxDb.Hsapiens.UCSC.hg38.knownGene (>= 3.4.6)",
+        "SNPlocs.Hsapiens.dbSNP144.GRCh38",
+        "Rsamtools",
+        "pasillaBamSubset (>= 0.0.5)",
+        "GenomicAlignments (>= 1.15.7)",
+        "ensembldb",
+        "AnnotationFilter",
+        "RUnit",
+        "BiocStyle",
+        "knitr",
+        "markdown"
+      ],
+      "VignetteBuilder": "knitr",
+      "Collate": "utils.R TxDb-schema.R TxDb-SELECT-helpers.R TxDb-class.R FeatureDb-class.R mapIdsToRanges.R id2name.R transcripts.R transcriptsBy.R transcriptsByOverlaps.R transcriptLengths.R exonicParts.R extendExonsIntoIntrons.R features.R microRNAs.R extractTranscriptSeqs.R extractUpstreamSeqs.R getPromoterSeq-methods.R select-methods.R nearest-methods.R transcriptLocs2refLocs.R coordinate-mapping-methods.R proteinToGenome.R coverageByTranscript.R makeTxDb.R makeTxDbFromUCSC.R makeTxDbFromBiomart.R makeTxDbFromEnsembl.R makeTxDbFromGRanges.R makeTxDbFromGFF.R makeFeatureDbFromUCSC.R makeTxDbPackage.R zzz.R",
+      "git_url": "https://git.bioconductor.org/packages/GenomicFeatures",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "a6e2405",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "M. Carlson [aut], H. Pagès [aut, cre], P. Aboyoun [aut], S. Falcon [aut], M. Morgan [aut], D. Sarkar [aut], M. Lawrence [aut], V. Obenchain [aut], S. Arora [ctb], J. MacDonald [ctb], M. Ramos [ctb], S. Saini [ctb], P. Shannon [ctb], L. Shepherd [ctb], D. Tenenbaum [ctb], D. Van Twisk [ctb]",
+      "Maintainer": "H. Pagès <hpages.on.github@gmail.com>"
+    },
     "GenomicRanges": {
       "Package": "GenomicRanges",
       "Version": "1.58.0",
@@ -1706,6 +1888,40 @@
       "BugReports": "https://R-forge.R-project.org/tracker/?func=add&atid=294&group_id=61",
       "NeedsCompilation": "no",
       "Repository": "CRAN"
+    },
+    "PANTHER.db": {
+      "Package": "PANTHER.db",
+      "Version": "1.0.12",
+      "Source": "Bioconductor",
+      "Title": "A set of annotation maps describing the entire PANTHER Gene Ontology",
+      "Description": "A set of annotation maps describing the entire Gene Ontology assembled using data from PANTHER.",
+      "Authors@R": "person(\"Julius\", \"Muller\", role = c(\"aut\", \"cre\"), email = \"mail@jmuller.eu\", comment = c(ORCID = \"0000-0002-1046-2968\"))",
+      "Imports": [
+        "BiocFileCache (>= 1.10.1)"
+      ],
+      "Depends": [
+        "AnnotationDbi",
+        "AnnotationHub",
+        "utils",
+        "methods",
+        "RSQLite"
+      ],
+      "Suggests": [
+        "RUnit",
+        "knitr",
+        "BiocStyle",
+        "rmarkdown"
+      ],
+      "License": "Artistic-2.0",
+      "biocViews": "FunctionalAnnotation,AnnotationHub,AnnotationData",
+      "VignetteBuilder": "knitr",
+      "git_url": "https://git.bioconductor.org/packages/PANTHER.db",
+      "git_branch": "devel",
+      "git_last_commit": "4549c6b",
+      "git_last_commit_date": "2023-10-02",
+      "NeedsCompilation": "no",
+      "Author": "Julius Muller [aut, cre] (<https://orcid.org/0000-0002-1046-2968>)",
+      "Maintainer": "Julius Muller <mail@jmuller.eu>"
     },
     "Polychrome": {
       "Package": "Polychrome",
@@ -3860,6 +4076,54 @@
       "NeedsCompilation": "yes",
       "Repository": "RSPM",
       "Encoding": "UTF-8"
+    },
+    "biomaRt": {
+      "Package": "biomaRt",
+      "Version": "2.62.1",
+      "Source": "Bioconductor",
+      "Title": "Interface to BioMart databases (i.e. Ensembl)",
+      "License": "Artistic-2.0",
+      "Description": "In recent years a wealth of biological data has become available in public data repositories. Easy access to these valuable data  resources and firm integration with data analysis is needed for comprehensive bioinformatics data analysis.  biomaRt provides an interface to a growing collection of databases implementing the BioMart software suite (<http://www.biomart.org>). The package enables retrieval of large amounts of data in a uniform way without the need to know the underlying database schemas or write complex SQL queries.  The most prominent examples of BioMart databases are maintain by Ensembl, which provides biomaRt users direct access to a diverse set of data and enables a wide range of powerful online queries from gene annotation to  database mining.",
+      "Authors@R": "c(person(\"Steffen\", \"Durinck\", role = c(\"aut\"),  email = \"biomartdev@gmail.com\"),  person(\"Wolfgang\", \"Huber\", role=\"aut\"), person(\"Sean\", \"Davis\", role=\"ctb\", email = \"sdavis2@mail.nih.gov\"), person(\"Francois\", \"Pepin\", role=\"ctb\"), person(given = \"Vince S\", family = \"Buffalo\", role=\"ctb\"), person(\"Mike\", \"Smith\", role=c(\"ctb\", \"cre\"),  email = \"grimbough@gmail.com\", comment = c(ORCID = \"0000-0002-7800-3848\")))",
+      "Depends": [
+        "methods"
+      ],
+      "Imports": [
+        "utils",
+        "AnnotationDbi",
+        "progress",
+        "stringr",
+        "httr2",
+        "digest",
+        "BiocFileCache",
+        "rappdirs",
+        "xml2",
+        "curl"
+      ],
+      "Suggests": [
+        "BiocStyle",
+        "knitr",
+        "mockery",
+        "rmarkdown",
+        "testthat",
+        "httptest2"
+      ],
+      "URL": "https://github.com/grimbough/biomaRt",
+      "BugReports": "https://github.com/grimbough/biomaRt/issues",
+      "VignetteBuilder": "knitr",
+      "biocViews": "Annotation",
+      "LazyLoad": "yes",
+      "NeedsCompilation": "no",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.0",
+      "Collate": "biomaRtClasses.R methods-Mart.R biomaRt.R caching.R ensembl.R ensembl_wrappers.R ensembl_ssl_settings.R utilityFunctions.R non-biomart-utils.R",
+      "git_url": "https://git.bioconductor.org/packages/biomaRt",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "1b1e4b1",
+      "git_last_commit_date": "2025-01-29",
+      "Repository": "Bioconductor 3.20",
+      "Author": "Steffen Durinck [aut], Wolfgang Huber [aut], Sean Davis [ctb], Francois Pepin [ctb], Vince S Buffalo [ctb], Mike Smith [ctb, cre] (<https://orcid.org/0000-0002-7800-3848>)",
+      "Maintainer": "Mike Smith <grimbough@gmail.com>"
     },
     "bit": {
       "Package": "bit",
@@ -6016,6 +6280,33 @@
       "NeedsCompilation": "yes",
       "Repository": "CRAN",
       "Encoding": "UTF-8"
+    },
+    "filelock": {
+      "Package": "filelock",
+      "Version": "1.0.3",
+      "Source": "Repository",
+      "Title": "Portable File Locking",
+      "Authors@R": "c( person(\"Gábor\", \"Csárdi\", , \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\")) )",
+      "Description": "Place an exclusive or shared lock on a file. It uses 'LockFile' on Windows and 'fcntl' locks on Unix-like systems.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://r-lib.github.io/filelock/, https://github.com/r-lib/filelock",
+      "BugReports": "https://github.com/r-lib/filelock/issues",
+      "Depends": [
+        "R (>= 3.4)"
+      ],
+      "Suggests": [
+        "callr (>= 2.0.0)",
+        "covr",
+        "testthat (>= 3.0.0)"
+      ],
+      "Config/Needs/website": "tidyverse/tidytemplate",
+      "Config/testthat/edition": "3",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.2.3",
+      "NeedsCompilation": "yes",
+      "Author": "Gábor Csárdi [aut, cre], Posit Software, PBC [cph, fnd]",
+      "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+      "Repository": "CRAN"
     },
     "fitdistrplus": {
       "Package": "fitdistrplus",
@@ -9000,6 +9291,57 @@
       "RemoteRef": "HEAD",
       "RemoteSha": "98402ed0c10cac020524bebbb9300614a799f6d1",
       "Author": "Hannah Pliner [aut], Xiaojie Qiu [aut], Cole Trapnell [aut], Brent Ewing [cre]"
+    },
+    "motifmatchr": {
+      "Package": "motifmatchr",
+      "Version": "1.28.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Fast Motif Matching in R",
+      "Date": "2017-03-08",
+      "Authors@R": "c( person(\"Alicia\", \"Schep\", email = \"aschep@gmail.com\", role = c(\"aut\",\"cre\")), person(\"Stanford University\", role = \"cph\"))",
+      "Maintainer": "Alicia Schep <aschep@gmail.com>",
+      "Description": "Quickly find motif matches for many motifs and many sequences. Wraps C++ code from the MOODS motif calling library, which was developed by Pasi Rastas, Janne Korhonen, and Petri Martinmäki.",
+      "License": "GPL-3 + file LICENSE",
+      "Imports": [
+        "Matrix",
+        "Rcpp",
+        "methods",
+        "TFBSTools",
+        "Biostrings",
+        "BSgenome",
+        "S4Vectors",
+        "SummarizedExperiment",
+        "GenomicRanges",
+        "IRanges",
+        "Rsamtools",
+        "GenomeInfoDb"
+      ],
+      "Depends": [
+        "R (>= 3.3)"
+      ],
+      "Suggests": [
+        "testthat",
+        "knitr",
+        "rmarkdown",
+        "BSgenome.Hsapiens.UCSC.hg19"
+      ],
+      "biocViews": "MotifAnnotation",
+      "LinkingTo": [
+        "Rcpp",
+        "RcppArmadillo"
+      ],
+      "SystemRequirements": "C++11",
+      "RoxygenNote": "6.0.1",
+      "VignetteBuilder": "knitr",
+      "Encoding": "UTF-8",
+      "git_url": "https://git.bioconductor.org/packages/motifmatchr",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "96b6c79",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "Alicia Schep [aut, cre], Stanford University [cph]"
     },
     "munsell": {
       "Package": "munsell",
@@ -13816,6 +14158,61 @@
       "Author": "Yihui Xie [aut, cre, cph] (<https://orcid.org/0000-0003-0645-5666>), Posit Software, PBC [cph, fnd], Christophe Dervieux [ctb] (<https://orcid.org/0000-0003-4474-2498>), Devon Ryan [ctb] (<https://orcid.org/0000-0002-8549-0971>), Ethan Heinzen [ctb], Fernando Cagua [ctb]",
       "Maintainer": "Yihui Xie <xie@yihui.name>",
       "Repository": "CRAN"
+    },
+    "txdbmaker": {
+      "Package": "txdbmaker",
+      "Version": "1.2.1",
+      "Source": "Bioconductor",
+      "Title": "Tools for making TxDb objects from genomic annotations",
+      "Description": "A set of tools for making TxDb objects from genomic annotations from various sources (e.g. UCSC, Ensembl, and GFF files). These tools allow the user to download the genomic locations of transcripts, exons, and CDS, for a given assembly, and to import them in a TxDb object. TxDb objects are implemented in the GenomicFeatures package, together with flexible methods for extracting the desired features in convenient formats.",
+      "biocViews": "Infrastructure, DataImport, Annotation, GenomeAnnotation, GenomeAssembly, Genetics, Sequencing",
+      "URL": "https://bioconductor.org/packages/txdbmaker",
+      "BugReports": "https://github.com/Bioconductor/txdbmaker/issues",
+      "License": "Artistic-2.0",
+      "Encoding": "UTF-8",
+      "Authors@R": "c( person(\"H.\", \"Pagès\", role=c(\"aut\", \"cre\"), email=\"hpages.on.github@gmail.com\"), person(\"M.\", \"Carlson\", role=\"aut\"), person(\"P.\", \"Aboyoun\", role=\"aut\"), person(\"S.\", \"Falcon\", role=\"aut\"), person(\"M.\", \"Morgan\", role=\"aut\"), person(\"M.\", \"Lawrence\", role=\"ctb\"), person(\"J.\", \"MacDonald\", role=\"ctb\"), person(\"M.\", \"Ramos\", role=\"ctb\"), person(\"S.\", \"Saini\", role=\"ctb\"), person(\"L.\", \"Shepherd\", role=\"ctb\"))",
+      "Depends": [
+        "BiocGenerics",
+        "S4Vectors",
+        "GenomeInfoDb (>= 1.39.9)",
+        "GenomicRanges",
+        "GenomicFeatures"
+      ],
+      "Imports": [
+        "methods",
+        "utils",
+        "stats",
+        "tools",
+        "httr",
+        "rjson",
+        "DBI",
+        "RSQLite (>= 2.0)",
+        "IRanges",
+        "UCSC.utils",
+        "AnnotationDbi",
+        "Biobase",
+        "BiocIO",
+        "rtracklayer",
+        "biomaRt (>= 2.59.1)"
+      ],
+      "Suggests": [
+        "RMariaDB",
+        "mirbase.db",
+        "ensembldb",
+        "RUnit",
+        "BiocStyle",
+        "knitr"
+      ],
+      "VignetteBuilder": "knitr",
+      "Collate": "utils.R Ensembl-utils.R findCompatibleMarts.R TxDb-schema.R TxDb-CREATE-TABLE-helpers.R makeTxDb.R makeTxDbFromUCSC.R makeTxDbFromBiomart.R makeTxDbFromEnsembl.R makeTxDbFromGRanges.R makeTxDbFromGFF.R makeFeatureDbFromUCSC.R makeTxDbPackage.R zzz.R",
+      "git_url": "https://git.bioconductor.org/packages/txdbmaker",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "84ec338",
+      "git_last_commit_date": "2024-11-21",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "H. Pagès [aut, cre], M. Carlson [aut], P. Aboyoun [aut], S. Falcon [aut], M. Morgan [aut], M. Lawrence [ctb], J. MacDonald [ctb], M. Ramos [ctb], S. Saini [ctb], L. Shepherd [ctb]",
+      "Maintainer": "H. Pagès <hpages.on.github@gmail.com>"
     },
     "tzdb": {
       "Package": "tzdb",

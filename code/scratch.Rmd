@@ -412,3 +412,115 @@ DefaultAssay(so_annotated) <- "RNA"
 
 FeaturePlot(so_annotated, "hnf1b")
 ```
+# HNF4a Analyses
+```{r}
+DefaultAssay(so) <- "RNA"
+
+#HNF genes:
+hnf_genes <- c("hnf1a", "hnf4g", "LOC107381564", "hnf4a", "hnf1b")
+
+translate(hnf_genes)
+
+
+#Jaspar Motif:
+hnf_motifs <- c("MA0114.4", "MA0484.2", "MA1494.1", "MA0046.2", "MA0153.2")
+hnf_motif_names <- c("HNF4A", "HNF4G", "HNF4A(var.2)", "HNF1A", "HNF1B")
+
+p <- FeaturePlot(so, features = hnf_genes, reduction = "umap") + patchwork::plot_annotation(caption = paste(translate(hnf_genes), collapse = ', '))
+SaveFigure(p, paste0(outs_dir, "hnf_feature"), height = 10, width = 10)
+
+
+DefaultAssay(so) <- "chromvar"
+FeaturePlot(so, hnf_motifs)
+
+
+p <- VlnPlot(so, hnf_genes, split.by = "timepoint_group", assay = "RNA")
+p <- VlnPlot(so, hnf_genes, split.by = "timepoint_group", assay = "gene_activity")
+p <- VlnPlot(so, hnf_motifs, split.by = "timepoint_group", assay = "chromvar")
+
+
+
+```
+what hnf peaks were opened in diapause?
+```{r}
+master_peaks <- read.csv("../results_all/master_peaks.csv", row.names = 1)
+
+HNF4A_peaks_dia_up <- master_peaks[master_peaks$MA0114.4 == T,] %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+
+
+annotation_counts <- as.data.frame(table(master_peaks$peak_annotation))
+colnames(annotation_counts) <- c("annotation", "count")
+
+# Create the stacked bar chart
+ggplot(annotation_counts, aes(x = "", y = count, fill = annotation)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = count), position = position_stack(vjust = 0.5), hjust = 0.5) +
+  labs(x = "Annotations", y = "Count", fill = "Annotation Type") +
+  ggtitle("Counts of Annotations in master_peaks") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+
+annotation_counts <- as.data.frame(table(HNF4A_peaks_dia_up$peak_annotation))
+colnames(annotation_counts) <- c("annotation", "count")
+
+# Create the stacked bar chart
+ggplot(annotation_counts, aes(x = "", y = count, fill = annotation)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = count), position = position_stack(vjust = 0.5), hjust = 0.5) +
+  labs(x = "Annotations", y = "Count", fill = "Annotation Type") +
+  ggtitle("Counts of Annotations in master_peaks") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+
+write.csv(translate(unique(HNF4A_peaks_dia_up$gene_name), to = "Human"), paste0(outs_dir, "HNF4A_peaks_dia_up_genes.csv"))
+
+
+
+```
+
+GO for HNF4a target genes
+```{r}
+go_data <- read.csv(paste0(outs_dir, "hnf4a_GO_mf.txt"), header = TRUE, sep = "\t")
+
+# Preprocess data if necessary (e.g., filter for significant terms)
+significant_go_data <- go_data %>%
+  filter(upload_1..FDR. < 0.05) %>%
+  arrange(desc(upload_1..fold.Enrichment.))
+
+# Bar plot of top 10 GO terms by fold enrichment
+top_go_terms <- head(significant_go_data, 10)
+
+ggplot(top_go_terms, aes(x = reorder(GO.molecular.function.complete, upload_1..fold.Enrichment.), y = upload_1..fold.Enrichment.)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 GO Terms by Fold Enrichment",
+       x = "GO Term",
+       y = "Fold Enrichment") +
+  theme_minimal()
+
+
+go_data <- read.csv(paste0(outs_dir, "hnf4a_GO_bp.txt"), header = TRUE, sep = "\t")
+
+# Preprocess data if necessary (e.g., filter for significant terms)
+significant_go_data <- go_data %>%
+  filter(upload_1..FDR. < 0.05) %>%
+  arrange(desc(upload_1..fold.Enrichment.))
+
+# Bar plot of top 10 GO terms by fold enrichment
+top_go_terms <- head(significant_go_data, 10)
+
+ggplot(top_go_terms, aes(x = reorder(GO.biological.process.complete, upload_1..fold.Enrichment.), y = upload_1..fold.Enrichment.)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 GO Terms by Fold Enrichment",
+       x = "GO Term",
+       y = "Fold Enrichment") +
+  theme_minimal()
+```
+
+
+
+
+
