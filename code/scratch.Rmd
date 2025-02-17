@@ -476,8 +476,6 @@ ggplot(annotation_counts, aes(x = "", y = count, fill = annotation)) +
 
 write.csv(translate(unique(HNF4A_peaks_dia_up$gene_name), to = "Human"), paste0(outs_dir, "HNF4A_peaks_dia_up_genes.csv"))
 
-
-
 ```
 
 GO for HNF4a target genes
@@ -489,17 +487,22 @@ significant_go_data <- go_data %>%
   filter(upload_1..FDR. < 0.05) %>%
   arrange(desc(upload_1..fold.Enrichment.))
 
-# Bar plot of top 10 GO terms by fold enrichment
-top_go_terms <- head(significant_go_data, 10)
+top_go_terms <- head(significant_go_data, 25)
 
-ggplot(top_go_terms, aes(x = reorder(GO.molecular.function.complete, upload_1..fold.Enrichment.), y = upload_1..fold.Enrichment.)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+# Create the plot
+p <- ggplot(top_go_terms, aes(x = reorder(GO.molecular.function.complete, upload_1..FDR.), 
+                              y = upload_1..fold.Enrichment., 
+                              fill = upload_1..FDR.)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "red", high = "blue") +
   coord_flip() +
-  labs(title = "Top 10 GO Terms by Fold Enrichment",
+  labs(title = "Top Molecular Function Terms",
        x = "GO Term",
        y = "Fold Enrichment") +
   theme_minimal()
 
+# Save the plot
+ggsave(paste0(outs_dir, "HNF4a_GOmf_barplot.png"), p, width = 15, height = 7)
 
 go_data <- read.csv(paste0(outs_dir, "hnf4a_GO_bp.txt"), header = TRUE, sep = "\t")
 
@@ -509,18 +512,52 @@ significant_go_data <- go_data %>%
   arrange(desc(upload_1..fold.Enrichment.))
 
 # Bar plot of top 10 GO terms by fold enrichment
-top_go_terms <- head(significant_go_data, 10)
+top_go_terms <- head(significant_go_data, 25)
 
-ggplot(top_go_terms, aes(x = reorder(GO.biological.process.complete, upload_1..fold.Enrichment.), y = upload_1..fold.Enrichment.)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+# Create the plot
+p <- ggplot(top_go_terms, aes(x = reorder(GO.biological.process.complete, upload_1..FDR.), 
+                              y = upload_1..fold.Enrichment., 
+                              fill = upload_1..FDR.)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "red", high = "blue") +
   coord_flip() +
-  labs(title = "Top 10 GO Terms by Fold Enrichment",
+  labs(title = "Top Biological Process Terms",
        x = "GO Term",
        y = "Fold Enrichment") +
   theme_minimal()
+
+# Save the plot
+ggsave(paste0(outs_dir, "HNF4a_GObp_barplot.png"), p, width = 12, height = 7)
+
 ```
 
 
+```{r}
+df <- data.frame(table(HNF4A_peaks_dia_up$peak_annotation))
+df$group <- "HNF4a"
+df2 <- data.frame(table(master_peaks$peak_annotation))
+df2$group <- "all"
+
+df <- rbind(df, df2)
+
+ggplot(df, aes(fill=Var1, y=Freq, x=group)) + 
+  geom_bar(position="fill", stat="identity")
+  
+  
+df <- df %>%
+  group_by(group) %>%
+  mutate(Percent = Freq / sum(Freq) * 100, Label = paste0(round(Percent, 1), "% (", Freq, ")"))
+
+# Create the stacked percent bar graph
+ggplot(df, aes(fill = Var1, y = Percent, x = group)) +
+  geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = Label),
+            position = position_fill(vjust = 0.5),
+            color = "white") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(y = "Percentage", x = "Group",
+       title = "Stacked Percent Bar Graph with Annotations")
+```
 
 
 
