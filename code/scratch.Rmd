@@ -12,40 +12,15 @@ suppressPackageStartupMessages({
   library(scCustomize)
   library(Polychrome)
 })
-```
 
-```{r}
-#translate from NCBI annotation to our annotation/an ortholog
-translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
-  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
-  
-  orthos <- orthos[!duplicated(orthos[[from]]),]
-  orthos <- orthos[!is.na(orthos[[from]]),]
-  
-  row.names(orthos) <- orthos[[from]]
-  translated <- orthos[genes,]
-  translated$genes <- genes
-  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
-  return(translated[[to]])
-}
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
-SaveFigure <- function(plots, path, type = "png", width, height, res){
-  if(type == "png") {
-    png(paste0(path, ".", type),
-      width = width, height = height, units = "in", res = 200)
-  } else {
-    pdf(paste0(path, ".", type),
-      width = width, height = height)
-  }
-  print(plots)
-  dev.off()
-  print(plots)
-}
-```
-
-```{r}
+#Set Out Directories
 outs_dir <- "../results_scratch/"
+fig_path <- "../results_scratch/"
 ```
+
 
 ```{r}
 so <- readRDS("../results_all/so_annotated_atac_processed.rds")
@@ -61,18 +36,18 @@ so_unfiltered <- readRDS("../results_all/so_unfiltered.rds")
 library(RColorBrewer)
 
 p <- DimPlot(so_unfiltered, group.by = "devtraj", cols = c("#D94801", "#6BAED6" , "#FDD0A2"))
-SaveFigure(p, paste0(outs_dir, "unfiltered_umap_devtraj"), width = 10, height = 10)
+SaveFigure(p, "unfiltered_umap_devtraj", width = 10, height = 10)
 
 p <- DimPlot(so_unfiltered, group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
                       "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
                       "#FD8D3C", "#FD8D3C", "#FD8D3C"))
-SaveFigure(p, paste0(outs_dir, "unfiltered_umap_origident"), width = 10, height = 10)
+SaveFigure(p, "unfiltered_umap_origident", width = 10, height = 10)
 
 
 p <- DimPlot(so_unfiltered, group.by = "scDblFinder.class.gex",
              cols = c("grey","blue"))
-SaveFigure(p, paste0(outs_dir, "unfiltered_umap_doublets"), width = 10, height = 10)
+SaveFigure(p, "unfiltered_umap_fdoublets", width = 10, height = 10)
 
 ```
 
@@ -81,16 +56,16 @@ p <- DimPlot(so_annotated, group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
                       "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
                       "#FD8D3C", "#FD8D3C", "#FD8D3C"), reduction = "umap", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_origident"), width = 10, height = 10)
+SaveFigure(p, "umap_origident", width = 10, height = 10)
 
 p <- DimPlot(so_annotated, group.by = "devtraj",
              cols = c("#FD8D3C",
                       "#2171B5",
                       "#800080"), reduction = "umap", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_devtraj"), width = 10, height = 10)
+SaveFigure(p, "umap_devtraj", width = 10, height = 10)
 
 p <- FeaturePlot(so_annotated, features = "nFeature_RNA", max.cutoff = 1000, reduction = "umap")
-SaveFigure(p, paste0(outs_dir, "umap_nFeature_RNA"), width = 10, height = 10)
+SaveFigure(p, "umap_nFeature_RNA", width = 10, height = 10)
 
 ```
 
@@ -121,16 +96,16 @@ so_dia <- runSeuratRNAProcessing(so_dia)
 p <- DimPlot(so_predia_dev, group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
                       "#FD8D3C", "#FD8D3C", "#FD8D3C"), reduction = "umap", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_predia_dev"), width = 10, height = 10)
+SaveFigure(p, "umap_predia_dev", width = 10, height = 10)
 
 p <- DimPlot(so_predia_dia, group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
                       "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B"), reduction = "umap", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_predia_dia"), width = 10, height = 10)
+SaveFigure(p, "umap_predia_dia", width = 10, height = 10)
 
 p <- DimPlot(so_dia, group.by = "orig.ident",
              cols = c("#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B"), reduction = "umap", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_dia"), width = 10, height = 10)
+SaveFigure(p, "umap_dia", width = 10, height = 10)
 
 ```
 
@@ -138,21 +113,21 @@ SaveFigure(p, paste0(outs_dir, "umap_dia"), width = 10, height = 10)
 so_middia <- readRDS("../results_all/markers_middia/so_middia.rds")
 
 p <- FeaturePlot(so_middia, reduction = "umap", features = "percent.mt")
-SaveFigure(p, paste0(outs_dir, "middia_percent.mt"), width = 5, height = 5)
+SaveFigure(p, "middia_percent.mt", width = 5, height = 5)
 
 
 p <- FeaturePlot(so_middia, reduction = "umap", features = "nCount_RNA", max.cutoff = 1000)
-SaveFigure(p, paste0(outs_dir, "middia_nCount_RNA"), width = 5, height = 5)
+SaveFigure(p, "middia_nCount_RNA", width = 5, height = 5)
 
 
 so_latedia <- readRDS("../results_all/markers_latedia/so_latedia.rds")
 
 p <- FeaturePlot(so_latedia, reduction = "umap", features = "percent.mt")
-SaveFigure(p, paste0(outs_dir, "latedia_percent.mt"), width = 5, height = 5)
+SaveFigure(p, "latedia_percent.mt", width = 5, height = 5)
 
 
 p <- FeaturePlot(so_latedia, reduction = "umap", features = "nCount_RNA", max.cutoff = 1000)
-SaveFigure(p, paste0(outs_dir, "latedia_nCount_RNA"), width = 5, height = 5)
+SaveFigure(p, "latedia_nCount_RNA", width = 5, height = 5)
 
 ```
 
@@ -166,19 +141,19 @@ names(colors) <- levels(Idents(so))
 
 DefaultAssay(so) <- "RNA"
 p <- DimPlot(so, reduction = "umap", cols = colors, pt.size = 0.7)
-SaveFigure(p, paste0(outs_dir, "umap_annotated_broad"), height = 10, width = 17)
+SaveFigure(p, "umap_annotated_broad", height = 10, width = 17)
 
 
 DefaultAssay(so) <- "ATAC"
 p <- DimPlot(so, reduction = "umap_ATAC", cols = colors, pt.size = 0.7)
-SaveFigure(p, paste0(outs_dir, "umap_atac_annotated_broad"), height = 10, width = 17)
+SaveFigure(p, "umap_atac_annotated_broad", height = 10, width = 17)
 
 DefaultAssay(so) <- "ATAC"
 p <- DimPlot(so, reduction = "umap_ATAC", group.by = "orig.ident",
              cols = c("#E496EF","#800080", "#800080",
                       "#C6DBEF", "#C6DBEF", "#6BAED6", "#6BAED6", "#2171B5", "#08306B",
                       "#FD8D3C", "#FD8D3C", "#FD8D3C"), pt.size = 0.3)
-SaveFigure(p, paste0(outs_dir, "umap_atac_origident"), height = 10, width = 10)
+SaveFigure(p, "umap_atac_origident", height = 10, width = 10)
 
 
 DefaultAssay(so) <- "ATAC"
@@ -186,11 +161,11 @@ p <- DimPlot(so, reduction = "umap_ATAC", group.by = "devtraj",
              cols = c("#FD8D3C",
                       "#2171B5",
                       "#800080"), pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_atac_devtraj"), width = 10, height = 10)
+SaveFigure(p, "umap_atac_devtraj", width = 10, height = 10)
 
 DefaultAssay(so) <- "ATAC"
 p <- DimPlot(so, reduction = "umap_ATAC", group.by = "ATAC_snn_res.0.8", pt.size = .3)
-SaveFigure(p, paste0(outs_dir, "umap_atac_clusters"), width = 10, height = 10)
+SaveFigure(p, "umap_atac_clusters", width = 10, height = 10)
 ```
 
 ```{r}
@@ -225,7 +200,7 @@ p <- ggplot(global_diavsdev, aes(x = avg_log2FC, y = -log10(p_val_adj), col=DE))
   geom_hline(yintercept=-log10(0.05), col="red") + 
   scale_color_manual(values=c("red", "blue", "black"))
 
-SaveFigure(p, paste0(outs_dir, "volcano_RNA"), width = 4, height = 4)
+SaveFigure(p, "volcano_RNA", width = 4, height = 4)
 
 ```
 
@@ -248,7 +223,7 @@ p <- ggplot(global_diavsdev_atac, aes(x = avg_log2FC, y = -log10(p_val_adj), col
   geom_hline(yintercept=-log10(0.05), col="red") + 
   scale_color_manual(values=c("red", "blue", "black"))
 
-SaveFigure(p, paste0(outs_dir, "volcano_ATAC"), width = 4, height = 4)
+SaveFigure(p, "volcano_ATAC", width = 4, height = 4)
 ```
 
 ```{r}
@@ -264,7 +239,7 @@ p <- MotifPlot(
   motifs = head(rownames(enriched.motifs))
 )
 
-SaveFigure(p, paste0(outs_dir, "motifs_dia"), width = 6, height = 4)
+SaveFigure(p, "motifs_dia", width = 6, height = 4)
 
 ```
 
@@ -284,7 +259,7 @@ p <- DimPlot(pseudo, reduction = "pca",
                       "#FD8D3C", "#FD8D3C", "#FD8D3C"),
              label = T, repel = T, pt.size = 4) + NoLegend()
 
-SaveFigure(p, paste0(outs_dir, "pseudobulk_pca"), width = 5, height = 5)
+SaveFigure(p, "pseudobulk_pca", width = 5, height = 5)
 ```
 
 ```{r}
@@ -296,21 +271,21 @@ so$hatch <- ifelse(so$annotation_broad == "hatching_gland", "hatching_gland", "a
 
 
 p <- FeaturePlot(so, reduction = "umap", features = "ppib") + NoLegend() + NoAxes()
-SaveFigure(p, paste0(outs_dir, "ppib_feature"), width = 5, height = 5)
+SaveFigure(p, "ppib_feature", width = 5, height = 5)
 
 p <- VlnPlot(so, features = "ppib", group.by = "hatch", split.by = "devtraj",
         cols = c("#E496EF", "#FD8D3C", "#2171B5"), pt.size = 0)
-SaveFigure(p, paste0(outs_dir, "ppib_vln"), width = 5, height = 5)
+SaveFigure(p, "ppib_vln", width = 5, height = 5)
 
 
 
 so$neuron <- ifelse(so$annotation_broad == "neuron", "neuron", "all others")
 p <- FeaturePlot(so, reduction = "umap", features = "LOC107372894") + NoLegend() + NoAxes()
-SaveFigure(p, paste0(outs_dir, "LOC107372894_feature"), width = 5, height = 5)
+SaveFigure(p, "LOC107372894_feature", width = 5, height = 5)
 
 p <- VlnPlot(so, features = "LOC107372894", group.by = "neuron", split.by = "devtraj",
         cols = c("#E496EF", "#FD8D3C", "#2171B5"),y.max = 2, pt.size = 0)
-SaveFigure(p, paste0(outs_dir, "LOC107372894_vln"), width = 5, height = 5)
+SaveFigure(p, "LOC107372894_vln", width = 5, height = 5)
 
 ```
 
@@ -340,7 +315,7 @@ ht <- Heatmap(hm,
         row_names_gp = gpar(fontsize = 5)
 )
 
-SaveFigure(ht, paste0(outs_dir, "figures/heatmap_diaup_bulk"), height = 10, width = 10)
+SaveFigure(ht, "figures/heatmap_diaup_bulk", height = 10, width = 10)
 
 ```
 
@@ -376,7 +351,7 @@ percentage_plot <- ggplot(cell_percentages, aes(x = timepoint_group, y = percent
   ggtitle("Cell Type Composition Over Time (Percentage)")
 
 # Print the plot
-SaveFigure(percentage_plot, paste0(outs_dir, "figures/cell_type_composition_percentage"), height = 10, width = 10)
+SaveFigure(percentage_plot, "figures/cell_type_composition_percentage", height = 10, width = 10)
 
 # Plot total counts
 count_plot <- ggplot(cell_counts, aes(x = timepoint_group, y = count, fill = annotation_broad)) +
@@ -387,7 +362,7 @@ count_plot <- ggplot(cell_counts, aes(x = timepoint_group, y = count, fill = ann
   ggtitle("Cell Type Composition Over Time (Total Cell Count)")
 
 # Print the plot
-SaveFigure(count_plot, paste0(outs_dir, "figures/cell_type_composition_total"), height = 10, width = 10)
+SaveFigure(count_plot, "figures/cell_type_composition_total", height = 10, width = 10)
 
 ```
 
@@ -427,7 +402,7 @@ hnf_motifs <- c("MA0114.4", "MA0484.2", "MA1494.1", "MA0046.2", "MA0153.2")
 hnf_motif_names <- c("HNF4A", "HNF4G", "HNF4A(var.2)", "HNF1A", "HNF1B")
 
 p <- FeaturePlot(so, features = hnf_genes, reduction = "umap") + patchwork::plot_annotation(caption = paste(translate(hnf_genes), collapse = ', '))
-SaveFigure(p, paste0(outs_dir, "hnf_feature"), height = 10, width = 10)
+SaveFigure(p, "hnf_feature", height = 10, width = 10)
 
 
 DefaultAssay(so) <- "chromvar"
@@ -644,7 +619,7 @@ so$annotation_ATAC <- Idents(so)
 
 
 p <- DimPlot(so, label = T, repel = T, reduction = "umap_ATAC") + NoLegend()
-SaveFigure(p, path = paste0(outs_dir, "umap_annotated_ATAC"),
+SaveFigure(p, path = "umap_annotated_ATAC",
            height = 10, width = 10)
 ```
 

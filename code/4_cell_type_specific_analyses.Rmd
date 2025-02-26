@@ -10,46 +10,15 @@ suppressPackageStartupMessages({
   library(Signac)
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(tidyverse)
-  library(readxl)
   library(scCustomize)
 })
-```
 
-## Helper Functions
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
-```{r}
-#translate from NCBI annotation to our annotation/an ortholog
-translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
-  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
-  
-  orthos <- orthos[!duplicated(orthos[[from]]),]
-  orthos <- orthos[!is.na(orthos[[from]]),]
-  
-  row.names(orthos) <- orthos[[from]]
-  translated <- orthos[genes,]
-  translated$genes <- genes
-  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
-  return(translated[[to]])
-}
-
-SaveFigure <- function(plots, path, type = "png", width, height, res){
-  if(type == "png") {
-    png(paste0(path, ".", type),
-      width = width, height = height, units = "in", res = 200)
-  } else {
-    pdf(paste0(path, ".", type),
-      width = width, height = height)
-  }
-  print(plots)
-  dev.off()
-  print(plots)
-}
-```
-
-## Output Directory
-
-```{r}
+#Set Out Directories
 outs_dir <- "../results_all/"
+fig_path <- "../results_all/figures/"
 ```
 
 ## Import Seurat Object
@@ -324,7 +293,7 @@ pseudo <- NormalizeData(pseudo)
 pseudo <- FindVariableFeatures(pseudo)
 I
 p <- DoHeatmap(pseudo, slot = "data", features = top_dia$gene)
-SaveFigure(p, paste0(outs_dir, "figures/heatmap_diaup_pseudo"), height = 10, width = 10)
+SaveFigure(p, "heatmap_diaup_pseudo", height = 10, width = 10)
 
 
 DotPlot(so, features = top_dia$gene)
@@ -333,7 +302,7 @@ DotPlot(so, features = top_dia$gene)
 
 top_dia <- global_DE %>% filter(DE == "Dia Up")
 p <- DoHeatmap(so, group.by = "timepoint_group", slot = "data", disp.max = 4,  features = top_dia$gene)
-SaveFigure(p, paste0(outs_dir, "figures/heatmap_diaup"), height = 10, width = 10)
+SaveFigure(p, "heatmap_diaup", height = 10, width = 10)
 
 FeaturePlot(so, c("LOC107373896", "LOC107373895"), reduction = "umap")
 
@@ -451,6 +420,6 @@ o1 = row_order(ht)
 
 View(hm[o1,])
 
-SaveFigure(ht, paste0(outs_dir, "figures/cell_typte_motif_enrich"), height = 40, width = 30)
+SaveFigure(ht, "cell_typte_motif_enrich", height = 40, width = 30)
 
 ```

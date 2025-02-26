@@ -1,7 +1,5 @@
 ---
 title: "3_atac_analyses"
-format: html
-editor: visual
 ---
 
 ```{r}
@@ -10,31 +8,14 @@ suppressPackageStartupMessages({
   library(Signac)
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(tidyverse)
-  library(readxl)
 })
-```
 
-# Helper Functions
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
-```{r}
-SaveFigure <- function(plots, path, type = "png", width, height, res){
-  if(type == "png") {
-    png(paste0(path, ".", type),
-      width = width, height = height, units = "in", res = 200)
-  } else {
-    pdf(paste0(path, ".", type),
-      width = width, height = height)
-  }
-  print(plots)
-  dev.off()
-  print(plots)
-}
-```
-
-## Set Output Directory
-
-```{r}
+#Set Out Directories
 outs_dir <- "../results_all/"
+fig_path <- "../results_all/"
 ```
 
 ## Import annotated seurat object
@@ -194,7 +175,7 @@ saveRDS(colors, paste0(outs_dir, "/colors_annotation_broad.rds"))
 
 
 p <- linkage_heatmap(so_annotated, link$gene, link$peak, unlist(split))
-SaveFigure(p, paste0(outs_dir, "figures/linkage_heatmap"), height = 20, width = 20)
+SaveFigure(p, "linkage_heatmap", height = 20, width = 20)
 
 ```
 
@@ -259,6 +240,7 @@ rownames(closest_genes) <- closest_genes$query_region
 ```
 
 Add peak annotations (exon vs promoter vs intron vs intergenic)
+
 ```{r}
 gtf <- rtracklayer::import("../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf")
 gtf_df <- data.frame(gtf)
@@ -353,6 +335,7 @@ all_peaks <- data.frame(all_peaks, row.names = 1)
 ```
 
 Motif Matrix
+
 ```{r}
 library(JASPAR2020)
 library(TFBSTools)
@@ -370,9 +353,6 @@ motif.matrix <- CreateMotifMatrix(
 all_peaks <- merge(all_peaks, motif.matrix, by = "row.names", all = T)
 
 ```
-
-
-
 
 ```{r}
 write.csv(all_peaks, paste0(outs_dir, "/master_peaks.csv"), na = "")

@@ -1,7 +1,5 @@
 ---
 title: "5_monocle"
-format: html
-editor: visual
 ---
 
 ```{r}
@@ -14,57 +12,17 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(readxl)
 })
-```
 
-## Helper Functions
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
-```{r}
-#translate from NCBI annotation to our annotation/an ortholog
-translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
-  orthos <- read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
-  
-  orthos <- orthos[!duplicated(orthos[[from]]),]
-  orthos <- orthos[!is.na(orthos[[from]]),]
-  
-  row.names(orthos) <- orthos[[from]]
-  translated <- orthos[genes,]
-  translated$genes <- genes
-  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
-  return(translated[[to]])
-}
-
-SaveFigure <- function(plots, path, type = "png", width, height, res){
-  if(type == "png") {
-    png(paste0(path, ".", type),
-      width = width, height = height, units = "in", res = 200)
-  } else {
-    pdf(paste0(path, ".", type),
-      width = width, height = height)
-  }
-  print(plots)
-  dev.off()
-  print(plots)
-}
-
-runSeuratRNAProcessing <- function(so, resolution = 0.8){
-  DefaultAssay(so) <- "RNA"
-  so <- NormalizeData(so)
-  so <- FindVariableFeatures(so)
-  so <- ScaleData(so)
-  so <- RunPCA(so)
-  so <- RunUMAP(so, dims = 1:30)
-  so <- FindNeighbors(so, dims = 1:30)
-  so <- FindClusters(so, resolution = resolution)
-  return(so)
-}
-```
-
-## Set Output Directory
-
-```{r}
+#Set Out Directories
 outs_dir <- "../results_all/"
+fig_path <- "../results_all/figures/"
 ```
 
+
+## Import Seurat Object
 ```{r}
 so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
 ```
@@ -88,7 +46,7 @@ cluster cells with monocle and plot
 cds_dev <- cluster_cells(cds_dev)
 p1 <- plot_cells(cds_dev, show_trajectory_graph = FALSE)
 p2 <- plot_cells(cds_dev, color_cells_by = "partition", show_trajectory_graph = FALSE)
-SaveFigure(p1+p2, paste0(outs_dir, "figures/monocle/dev_clusters"), height=3, width=5)
+SaveFigure(p1+p2, "monocle/dev_clusters", height=3, width=5)
 ```
 
 ```{r}
@@ -113,7 +71,7 @@ p <- plot_cells(cds_dev,
            label_cell_groups=FALSE,
            show_trajectory_graph=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/dev_cluster_markers"), height=3, width=5)
+SaveFigure(p, "monocle/dev_cluster_markers", height=3, width=5)
 ```
 
 create trajectories in umap
@@ -126,7 +84,7 @@ p <- plot_cells(cds_dev,
            label_groups_by_cluster=FALSE,
            label_leaves=FALSE,
            label_branch_points=FALSE)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/dev_trajectory"), height=3, width=3)
+SaveFigure(p, "monocle/dev_trajectory", height=3, width=3)
 ```
 
 order cells in pseudotime
@@ -141,7 +99,7 @@ p <- plot_cells(cds_dev,
            label_branch_points=FALSE,
            graph_label_size=1.5)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/dev_pseudotime"), height=3, width=5)
+SaveFigure(p, "monocle/dev_pseudotime", height=3, width=5)
 ```
 
 investigate somite lineage
@@ -220,7 +178,7 @@ p <- plot_cells(cds_blood,
            color_cells_by = "timepoint_group",
            show_trajectory_graph = F,
            label_cell_groups = F)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_umap"), height=3, width=3)
+SaveFigure(p, "monocle/blood_umap", height=3, width=3)
 
 
 p1 <- plot_cells(cds_blood,
@@ -228,14 +186,14 @@ p1 <- plot_cells(cds_blood,
 p2 <- plot_cells(cds_blood,
                  color_cells_by = "partition",
                  show_trajectory_graph = FALSE)
-SaveFigure(p1+p2, paste0(outs_dir, "figures/monocle/blood_clusters"), height=3, width=5)
+SaveFigure(p1+p2,"monocle/blood_clusters", height=3, width=5)
 
 p <- plot_cells(cds_blood,
            color_cells_by = "timepoint_group",
            label_groups_by_cluster=FALSE,
            label_leaves=FALSE,
            label_branch_points=FALSE)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_graph"), height=3, width=5)
+SaveFigure(p, "monocle/blood_graph", height=3, width=5)
 
 p <- plot_cells(cds_blood,
            color_cells_by = "pseudotime",
@@ -243,7 +201,7 @@ p <- plot_cells(cds_blood,
            label_leaves=FALSE,
            label_branch_points=FALSE,
            graph_label_size=1.5)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_pseudotime"), height=3, width=5)
+SaveFigure(p, "monocle/blood_pseudotime", height=3, width=5)
 ```
 
 compute genes and modules associated with diapause trajectory
@@ -259,7 +217,7 @@ p <- plot_cells(cds_blood, genes=top_blood_diapause_genes,
            label_cell_groups=FALSE,
            label_leaves=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_pseudo_genes"), height=8, width=8)
+SaveFigure(p, "monocle/blood_pseudo_genes", height=8, width=8)
 
 ```
 
@@ -279,7 +237,7 @@ p <- plot_cells(cds_blood,
            label_cell_groups=FALSE,
            show_trajectory_graph=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_pseudo_modules"), height=5, width=5)
+SaveFigure(p, "monocle/blood_pseudo_modules", height=5, width=5)
 
 ```
 
@@ -287,7 +245,7 @@ SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_pseudo_modules"), height=5
 p <- plot_genes_in_pseudotime(cds_blood[c("rbm5", "LOC107392522", "LOC107373896","arrdc3", "jarid2", "jade2"),],
                               color_cells_by="timepoint_group")
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/blood_pseudotime_genes"), width = 5, height =5)
+SaveFigure(p, "monocle/blood_pseudotime_genes", width = 5, height =5)
 ```
 
 ## Run Monocle on Endothelial
@@ -300,7 +258,7 @@ p <- plot_cells(cds_endothelial,
            color_cells_by = "timepoint_group",
            show_trajectory_graph = F,
            label_cell_groups = F)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endothelial_umap"), height=3, width=3)
+SaveFigure(p, "monocle/endothelial_umap", height=3, width=3)
 
 
 p1 <- plot_cells(cds_endothelial,
@@ -308,14 +266,14 @@ p1 <- plot_cells(cds_endothelial,
 p2 <- plot_cells(cds_endothelial,
                  color_cells_by = "partition",
                  show_trajectory_graph = FALSE)
-SaveFigure(p1+p2, paste0(outs_dir, "figures/monocle/endothelial_clusters"), height=3, width=5)
+SaveFigure(p1+p2, "monocle/endothelial_clusters", height=3, width=5)
 
 p <- plot_cells(cds_endothelial,
            color_cells_by = "timepoint_group",
            label_groups_by_cluster=FALSE,
            label_leaves=FALSE,
            label_branch_points=FALSE)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endothelial_graph"), height=3, width=5)
+SaveFigure(p, "monocle/endothelial_graph", height=3, width=5)
 
 p <- plot_cells(cds_endothelial,
            color_cells_by = "pseudotime",
@@ -323,7 +281,7 @@ p <- plot_cells(cds_endothelial,
            label_leaves=FALSE,
            label_branch_points=FALSE,
            graph_label_size=1.5)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endothelial_pseudotime"), height=3, width=5)
+SaveFigure(p, "monocle/endothelial_pseudotime", height=3, width=5)
 ```
 
 compute genes and modules associated with diapause trajectory
@@ -339,7 +297,7 @@ p <- plot_cells(cds_endothelial, genes=top_endo_diapause_genes,
            label_cell_groups=FALSE,
            label_leaves=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endothelial_pseudo_genes"), height=8, width=8)
+SaveFigure(p, "monocle/endothelial_pseudo_genes", height=8, width=8)
 
 ```
 
@@ -359,7 +317,7 @@ p <- plot_cells(cds_endothelial,
            label_cell_groups=FALSE,
            show_trajectory_graph=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endo_pseudo_modules"), height=5, width=5)
+SaveFigure(p, "monocle/endo_pseudo_modules", height=5, width=5)
 
 ```
 
@@ -367,7 +325,7 @@ SaveFigure(p, paste0(outs_dir, "figures/monocle/endo_pseudo_modules"), height=5,
 p <- plot_genes_in_pseudotime(cds_endothelial[c("rbm5", "LOC107392522", "LOC107373896","arrdc3", "jarid2", "jade2"),],
                               color_cells_by="timepoint_group")
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/endo_pseudotime_genes"), width = 5, height =5)
+SaveFigure(p, "monocle/endo_pseudotime_genes", width = 5, height =5)
 ```
 
 ## Run Monocle on Hatching Gland
@@ -380,7 +338,7 @@ p <- plot_cells(cds_hatch,
            color_cells_by = "timepoint_group",
            show_trajectory_graph = F,
            label_cell_groups = F)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_umap"), height=3, width=3)
+SaveFigure(p, "monocle/hatch_umap", height=3, width=3)
 
 
 p1 <- plot_cells(cds_hatch,
@@ -388,14 +346,14 @@ p1 <- plot_cells(cds_hatch,
 p2 <- plot_cells(cds_hatch,
                  color_cells_by = "partition",
                  show_trajectory_graph = FALSE)
-SaveFigure(p1+p2, paste0(outs_dir, "figures/monocle/hatch_clusters"), height=3, width=5)
+SaveFigure(p1+p2, "monocle/hatch_clusters", height=3, width=5)
 
 p <- plot_cells(cds_hatch,
            color_cells_by = "timepoint_group",
            label_groups_by_cluster=FALSE,
            label_leaves=FALSE,
            label_branch_points=FALSE)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_graph"), height=3, width=5)
+SaveFigure(p, "monocle/hatch_graph", height=3, width=5)
 
 p <- plot_cells(cds_hatch,
            color_cells_by = "pseudotime",
@@ -403,7 +361,7 @@ p <- plot_cells(cds_hatch,
            label_leaves=FALSE,
            label_branch_points=FALSE,
            graph_label_size=1.5)
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_pseudotime"), height=3, width=5)
+SaveFigure(p, "monocle/hatch_pseudotime", height=3, width=5)
 ```
 
 compute genes and modules associated with diapause trajectory
@@ -419,7 +377,7 @@ p <- plot_cells(cds_hatch, genes=top_hatch_diapause_genes,
            label_cell_groups=FALSE,
            label_leaves=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_pseudo_genes"), height=8, width=8)
+SaveFigure(p, "monocle/hatch_pseudo_genes", height=8, width=8)
 
 ```
 
@@ -439,7 +397,7 @@ p <- plot_cells(cds_hatch,
            label_cell_groups=FALSE,
            show_trajectory_graph=FALSE)
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_pseudo_modules"), height=5, width=5)
+SaveFigure(p, "monocle/hatch_pseudo_modules", height=5, width=5)
 
 ```
 
@@ -447,7 +405,7 @@ SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_pseudo_modules"), height=5
 p <- plot_genes_in_pseudotime(cds_hatch[c("rbm5", "LOC107392522", "LOC107373896","arrdc3", "jarid2", "jade2"),],
                               color_cells_by="timepoint_group")
 
-SaveFigure(p, paste0(outs_dir, "figures/monocle/hatch_pseudotime_genes"), width = 5, height =5)
+SaveFigure(p, "monocle/hatch_pseudotime_genes", width = 5, height =5)
 ```
 
 Overlap between diapause-associated modules

@@ -1,9 +1,3 @@
----
-title: "1_preprocessing_nov24"
-format: html
-editor: visual
----
-
 ## Load Libraries
 
 ```{r}
@@ -41,7 +35,6 @@ annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.g
 #add sample names here in order of aggr library file
 sample_names <- c("25som_1", "hb_1", "hb_2", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2", "dia1mo_1", "dia3mo_1", "dev1d_1", "dev1d_2", "dev1d_3")
 ```
-
 
 # SoupX Ambient RNA Removal
 
