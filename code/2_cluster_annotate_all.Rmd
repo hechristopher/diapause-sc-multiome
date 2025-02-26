@@ -511,8 +511,6 @@ write.csv(top_markers, paste0(outs_dir, "/top_markers"))
 ## Standard Seurat Workflow
 
 select doublets to remove
->>>>>>> a7db6049cb9eafe557bc3beb7d0820c899da253e
-
 ```{r}
 #predia
 cluster.ids <- c(
@@ -972,6 +970,8 @@ broad_cols <- c(
   "notochord" = "#C5B0D5",
   "leukocyte" = "#FF9900"
 )
+
+saveRDS(broad_cols, paste0(outs_dir, "colors_annotation_broad.rds"))
 
 broad_cols_neuron <- c(
   "neuron_progenitor_dia" = "#1F78B4",

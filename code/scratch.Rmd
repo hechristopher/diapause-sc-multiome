@@ -559,5 +559,106 @@ ggplot(df, aes(fill = Var1, y = Percent, x = group)) +
        title = "Stacked Percent Bar Graph with Annotations")
 ```
 
+ATAC annotations
+```{r}
+DefaultAssay(so) <- "ATAC"
 
+
+DimPlot(object = so, reduction = "umap_ATAC", group.by = "ATAC_snn_res.0.8", label = TRUE) + NoLegend()
+
+atac_markers <- FindAllMarkers(so, assay = "gene_activity", group.by = "ATAC_snn_res.0.8", only.pos = T)
+
+```
+```{r}
+atac_markers$gene_name <- translate(atac_markers$gene)
+atac_markers$gene_name <- paste0(atac_markers$gene,
+                                  " (", atac_markers$gene_name, ")")
+
+top_atac_markers <- atac_markers %>%
+  filter(avg_log2FC > 0.5) %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+write.csv(top_atac_markers,
+          paste0(outs_dir, "top_atac_markers.csv"))
+
+```
+```{r}
+DefaultAssay(so) <- 'gene_activity'
+FeaturePlot(so, features = c("LOC107376706", "LOC107373085", "LOC107382309"), reduction = "umap_ATAC")
+
+FeaturePlot(so, features = c("clec3b"), reduction = "umap_ATAC")
+
+```
+
+```{r}
+Idents(so) <- "ATAC_snn_res.0.8"
+
+cluster.ids <- c(
+  'brain_1',
+  'spinal_cord_1',
+  'neuron_1',
+  'midbrain_hindbrain',
+  'myotome/muscle_1',
+  'neuron_progenitor_1',
+  'somite_1',
+  'somite_2',
+  'telencephalon/optic_cup_1',
+  'neuron_progenitor_2',
+  'epidermal',
+  'spinal_cord_2',
+  'telencephalon/optic_cup_2',
+  'spinal_cord_3',
+  'telencephalon/optic_cup_3',
+  'neuron_progenitor_3',
+  'spinal_cord_4',
+  'unknown',
+  'head_kidney',
+  'hatching_gland',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'brain_2',
+  'periderm',
+  'endothelial',
+  'primitive_gut',
+  'floor_plate',
+  'spinal_cord_5',
+  'neural_crest',
+  'blood',
+  'otic_vesicle',
+  'neuron_dscam',
+  'neuron_neurod1',
+  'telencephalon/optic_cup_4',
+  'myotome/muscle_2'
+)
+
+names(cluster.ids) <- levels(so)
+so <- RenameIdents(so, cluster.ids)
+
+so$annotation_ATAC <- Idents(so)
+
+
+p <- DimPlot(so, label = T, repel = T, reduction = "umap_ATAC") + NoLegend()
+SaveFigure(p, path = paste0(outs_dir, "umap_annotated_ATAC"),
+           height = 10, width = 10)
+```
+
+```{r}
+
+
+so_latedia <- readRDS(paste0(outs_dir, "markers_latedia/so_latedia.rds"))
+
+DimPlot(so_latedia, reduction = "umap", label = T)
+
+VlnPlot(so_latedia, "lcp1")
+FeaturePlot(so_latedia, "lcp1", reduction = "umap")
+
+table(Idents(so_latedia))
+
+```
 

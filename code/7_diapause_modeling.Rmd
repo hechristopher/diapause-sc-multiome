@@ -1,0 +1,335 @@
+
+## Initialize environment
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(SeuratWrappers)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(glmnet)
+})
+
+#import helper functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+#set output and figure directories
+outs_dir <- "../results_all/diapause_model/"
+fig_dir <- "../results_all/diapause_model/"
+```
+
+```{r}
+so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+DefaultAssay(so) <- "RNA"
+```
+
+
+# Modeling Diapause Status
+
+
+1. Subsample cells equally from each timepoint
+  - 25som hb dia1d dia2d dia6d dia1mo dia3mo
+2. remove genes with low variance
+3. split into 11 partitions
+```{r}
+meta <- so@meta.data
+meta$barcodes <- row.names(meta)
+
+#randomly select 4400 cells per sample, splitting into 11 partitions each
+set.seed(1)
+subsampled_barcodes <- meta %>%
+  group_by(timepoint) %>%
+  slice_sample(n=4400) %>%
+  mutate(partition = ntile(row_number(), 11)) %>%  # Divide into 11 equal parts
+  ungroup()
+
+#remove dev timepoint
+subsampled_barcodes <- subsampled_barcodes %>% filter(timepoint != "dev1d")
+
+#create encodings for timepoints
+encoding_1 <- c("25som" = 1, "hb" = 2, "dia1d" = 3, "dia2d" = 4, "dia6d" = 5, "dia1mo" = 6, "dia3mo" = 7)
+encoding_2 <- c("25som" = 0, "hb" = 0, "dia1d" = 1, "dia2d" = 2, "dia6d" = 3, "dia1mo" = 4, "dia3mo" = 5)
+encoding_realtime <- c("25som" = -1, "hb" = 0, "dia1d" = 1, "dia2d" = 2, "dia6d" = 6, "dia1mo" = 30, "dia3mo" = 90)
+
+subsampled_barcodes$timepoint_encoded1 <- encoding_1[subsampled_barcodes$timepoint]
+subsampled_barcodes$timepoint_encoded2 <- encoding_2[subsampled_barcodes$timepoint]
+subsampled_barcodes$timepoint_encoded_realtime <- encoding_realtime[subsampled_barcodes$timepoint]
+
+#add back rownames
+rownames(subsampled_barcodes) <- subsampled_barcodes$barcodes
+
+# View the resulting subsampled dataframe
+table(subsampled_barcodes$partition, subsampled_barcodes$timepoint)
+
+#subset data according to barcodes
+so_dia_model <- subset(so, cells = subsampled_barcodes$barcodes)
+so_dia_model <- NormalizeData(so_dia_model)
+
+#get sparse matrix
+sparse_mat <- so_dia_model@assays$RNA@layers$data
+rownames(sparse_mat) <- rownames(so_dia_model@assays$RNA@features)
+colnames(sparse_mat) <- rownames(so_dia_model@assays$RNA@cells)
+
+#remove genes with no variance
+some_sds <- sparseMatrixStats::rowSds(sparse_mat)
+all_genes <- rownames(sparse_mat)
+ok_genes <- all_genes[which(some_sds > 0)]
+sparse_mat_filter <- t(sparse_mat[ok_genes,])
+
+#select columns and add back rownames
+subsampled_barcodes <- data.frame(subsampled_barcodes[,c("orig.ident", "devtraj", "timepoint", "timepoint_group", "annotation_merged", "annotation_grouped", "annotation_broad", "diadev", "barcodes", "partition", "timepoint_encoded1", "timepoint_encoded2", "timepoint_encoded_realtime")])
+rownames(subsampled_barcodes) <- subsampled_barcodes$barcodes
+subsampled_barcodes <- subsampled_barcodes[rownames(sparse_mat_filter),]
+
+
+#save top variable genes
+so_dia_model <- FindVariableFeatures(so_dia_model, nfeatures = 22000)
+head(VariableFeatures(so_dia_model))
+
+saveRDS(sparse_mat_filter, paste0(outs_dir, "sparse_mat_filter.rds"))
+saveRDS(subsampled_barcodes, paste0(outs_dir, "barcode_meta.rds"))
+saveRDS(VariableFeatures(so_dia_model), paste0(outs_dir, "top_22000_variable.rds"))
+```
+
+
+```{r}
+sparse_mat_filter <- readRDS(paste0(outs_dir, "sparse_mat_filter.rds"))
+subsampled_barcodes <- readRDS(paste0(outs_dir, "barcode_meta.rds"))
+variable_features <- readRDS(paste0(outs_dir, "top_22000_variable.rds"))
+
+train_barcodes <- subsampled_barcodes %>% filter(partition != 11)
+test_barcodes <- subsampled_barcodes %>% filter(partition == 11)
+
+sparse_mat_train <- sparse_mat_filter[train_barcodes$barcodes,]
+sparse_mat_test <- sparse_mat_filter[test_barcodes$barcodes,]
+```
+
+#Real Time Encoding
+```{r}
+m <- cv.glmnet(sparse_mat_train, train_barcodes$timepoint_encoded_realtime, foldid=train_barcodes$partition, trace.it=1)
+saveRDS(m, paste0(outs_dir, 'lasso_model_encoding1.Rds'))
+```
+
+```{r}
+m <- readRDS(paste0(outs_dir, 'lasso_model_encoding1.Rds'))
+
+plot(m)
+
+m$lambda.min
+m$lambda.1se
+
+coefs <- coef(m, s = "lambda.min"); length(coefs[coefs[,1]!=0])
+```
+
+```{r}
+#predict whole dataset
+prediction_encoded_rt <- predict(m, newx = sparse_mat_filter, s = "lambda.min")
+subsampled_barcodes$prediction_encoded_rt <- prediction_encoded_rt
+
+mse <- mean((subsampled_barcodes$timepoint_encoded_realtime - subsampled_barcodes$prediction_encoded_rt)^2)
+
+ggplot(subsampled_barcodes, aes(x = as.factor(timepoint_encoded_realtime), y = prediction_encoded_rt)) + geom_boxplot() + annotate("text", x = 1, y = 80, label = paste0("mse = ", round(mse,4)))
+```
+
+# Encoding 2
+```{r}
+m <- cv.glmnet(sparse_mat_train, train_barcodes$timepoint_encoded2, foldid=train_barcodes$partition, trace.it=1)
+saveRDS(m, paste0(outs_dir, 'lasso_model_encoding2.Rds'))
+```
+
+
+```{r}
+m <- readRDS(paste0(outs_dir, 'lasso_model_encoding2.Rds'))
+
+plot(m)
+
+m$lambda.min
+m$lambda.1se
+
+coefs <- coef(m, s = "lambda.min"); length(coefs[coefs[,1]!=0])
+```
+
+
+```{r}
+#predict test set
+prediction_encoded2 <- predict(m, newx = sparse_mat_test, s = "lambda.min")
+test_barcodes$prediction_encoded2 <- prediction_encoded2
+ggplot(test_barcodes, aes(x = as.factor(timepoint_encoded2), y = prediction_encoded2)) + geom_boxplot()
+
+mean((test_barcodes$timepoint_encoded2 - test_barcodes$prediction_encoded2)^2)
+
+```
+
+```{r}
+#predict whole dataset
+prediction_encoded2_full <- predict(m, newx = sparse_mat_filter, s = "lambda.min")
+subsampled_barcodes$prediction_encoded2 <- prediction_encoded2_full
+
+mse <- mean((subsampled_barcodes$timepoint_encoded2 - subsampled_barcodes$prediction_encoded2)^2)
+
+ggplot(subsampled_barcodes, aes(x = as.factor(timepoint_encoded2), y = prediction_encoded2)) + geom_boxplot() +
+  annotate("text", x = 1, y = 5, label = paste0("mse = ", round(mse,4)))
+
+```
+
+```{r}
+coefs <- coef(m, s = "lambda.min"); 
+coefs <- coefs[coefs[,1]!=0,]
+
+coefs <- sort(coefs, decreasing = T)
+
+translate(names(coefs[2:20]))
+
+VlnPlot(so, features = names(coefs[2:20]), group.by = "timepoint_group")
+```
+
+
+# Try different # genes in model
+```{r}
+#Sweep of Variable Features
+for(i in seq(from=1000, to=22000, by=1000)){
+  genes = head(variable_features, i)
+  print(paste0(length(genes), " genes"))
+  
+  #subset matrix with variable genes
+  mat <- t(t(sparse_mat_filter)[genes,])
+  train <- mat[train_barcodes$barcodes,]
+  test <- mat[test_barcodes$barcodes,]
+  
+  #fit cv model
+  m <- cv.glmnet(train, train_barcodes$timepoint_encoded2, foldid=train_barcodes$partition, trace.it=1)
+  saveRDS(m, paste0(outs_dir, 'lasso_model_encoding2_', i, 'genes.Rds'))
+  
+  png(paste0(outs_dir, "cvplot_", i, "genes.png"), height=300, width=400)
+  print(plot(m)); dev.off()
+  
+  prediction <- predict(m, newx = mat, s = "lambda.min")
+  subsampled_barcodes$prediction_encoded2 <- prediction
+  mse <- mean((subsampled_barcodes$timepoint_encoded2 - subsampled_barcodes$prediction_encoded2)^2)
+  
+  p <- ggplot(subsampled_barcodes, aes(x = as.factor(timepoint_encoded2), y = prediction_encoded2)) + geom_boxplot() +
+    annotate("text", x = 1.5, y = 5, label = paste0("mse = ", round(mse,4)))
+  SaveFigure(p, paste0('prediction_', i, 'genes'), width = 5, height = 5)
+}
+```
+
+```{r}
+prediction_sweep <- subsampled_barcodes[,c("barcodes", "timepoint_encoded2")]
+mse_sweep <- c()
+
+for(i in seq(from=1000, to=22000, by=1000)){
+  genes = head(variable_features, i)
+  print(paste0(length(genes), " genes"))
+  
+  #subset matrix with variable genes
+  mat <- t(t(sparse_mat_filter)[genes,])
+
+  m <- readRDS(paste0(outs_dir, 'lasso_model_encoding2_', i, 'genes.Rds'))
+  prediction <- predict(m, newx = mat, s = "lambda.min")
+  
+  prediction_sweep[[paste0(i, "_genes_prediction")]] <- prediction[,1]
+  mse <- mean((prediction_sweep$timepoint_encoded2 - prediction[,1])^2)
+  
+  mse_sweep <- c(mse_sweep, mse)
+}
+
+prediction_sweep
+mse_sweep
+
+mse_df <- data.frame(genes = seq(from=1000, to=22000, by=1000))
+mse_df$mse <- mse_sweep
+
+ggplot(mse_df, aes(x = genes, y = mse)) + geom_point()
+```
+
+# Compute WGCNA for single cell
+```{r}
+library(WGCNA)
+library(hdWGCNA)
+set.seed(1)
+
+
+so_dia_model <- SetupForWGCNA(
+  so_dia_model,
+  gene_select = "fraction", # the gene selection approach
+  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+  wgcna_name = "wgcna" # the name of the hdWGCNA experiment
+)
+```
+
+
+```{r}
+# construct metacells  in each group
+so_dia_model <- MetacellsByGroups(
+  seurat_obj = so_dia_model,
+  group.by = c("annotation_broad", "orig.ident"), # specify the columns in seurat_obj@meta.data to group by
+  reduction = 'umap', # select the dimensionality reduction to perform KNN on
+  k = 25, # nearest-neighbors parameter
+  max_shared = 10, # maximum number of shared cells between two metacells
+  ident.group = 'annotation_broad' # set the Idents of the metacell seurat object
+)
+```
+
+
+```{r}
+# normalize metacell expression matrix:
+so_dia_model <- NormalizeMetacells(so_dia_model)
+
+# setup expression matrix
+so_dia_model <- SetDatExpr(
+  so_dia_model,
+  assay = 'RNA', # using RNA assay
+  layer = 'data' # using normalized data
+)
+```
+
+
+```{r}
+# Test different soft powers:
+so_dia_model <- TestSoftPowers(
+  so_dia_model,
+  networkType = 'signed' # you can also use "unsigned" or "signed hybrid"
+)
+
+# plot the results:
+plot_list <- PlotSoftPowers(so_dia_model)
+
+# assemble with patchwork
+patchwork::wrap_plots(plot_list, ncol=2)
+```
+```{r}
+# construct co-expression network:
+so_dia_model <- ConstructNetwork(
+  so_dia_model,
+)
+```
+
+```{r}
+PlotDendrogram(so_dia_model, main='INH hdWGCNA Dendrogram')
+```
+
+
+```{r}
+# compute all MEs in the full single-cell dataset
+so_dia_model <- ModuleEigengenes(so_dia_model)
+MEs <- GetMEs(so_dia_model, harmonized=FALSE)
+```
+
+
+```{r}
+df_diadev_me <- data.frame(barcodes = subsampled_barcodes$barcodes, timepoint = subsampled_barcodes$timepoint_encoded2)
+row.names(df_diadev_me) <- df_diadev_me$barcodes
+
+
+df_diadev_me <- merge(df_diadev_me, MEs, by = 'row.names')
+
+df_diadev_me
+
+cor(df_diadev_me$timepoint, df_diadev_me$blue) 
+cor(df_diadev_me$timepoint, df_diadev_me$brown) 
+cor(df_diadev_me$timepoint, df_diadev_me$turquoise) 
+cor(df_diadev_me$timepoint, df_diadev_me$grey) 
+
+
+```
+

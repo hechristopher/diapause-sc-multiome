@@ -1,0 +1,84 @@
+---
+title: "figure2"
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+})
+
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+```
+
+```{r}
+outs_dir <- "../results_all/"
+fig_dir <- "../figures/figure2/"
+```
+
+```{r}
+so <- readRDS("../results_all/so_dual_annotated.rds")
+```
+
+#Global DE
+```{r}
+timepoint_cols <- c("#E496EF","#C6DBEF", "#2171B5", "#08306B", "#FD8D3C")
+
+global_DE <- read.csv("../results_all/global_diavsdev.csv", row.names = 1)
+dia_genes <- global_DE %>% filter(avg_log2FC > 2 & p_val_adj < 0.05 & pct.1 > 0.2)
+dev_genes <- global_DE %>% filter(avg_log2FC < -2 & p_val_adj < 0.05 & pct.2 > 0.2)
+
+
+DefaultAssay(so) <- "RNA"
+# so <- ScaleData(so, features = rownames(so))
+p <- DoHeatmap(so, cells = (seq(1, 80000, 50)),
+               features = c(dia_genes$gene, dev_genes$gene),
+               group.by = "timepoint_group", group.colors = timepoint_cols,
+               slot = "data"
+) + scale_y_discrete(labels=rev(translate(c(dia_genes$gene, dev_genes$gene))))
+SaveFigure(p, "global_diadev_heatmap", type = "pdf", width = 10, height = 10)
+```
+
+```{r}
+diapause_genes <- dia_genes$gene[2:4]
+for(gene in diapause_genes){
+  p <- FeaturePlot(so, gene, reduction = "umap") + labs(title = translate(gene)) + NoAxes()
+  SaveFigure(p, paste0(translate(gene), "_featureUMAP"), type = "pdf", width = 5, height = 5)
+}
+```
+```{r}
+master_peaks <- read.csv("../results_all/master_peaks.csv", row.names = 1)
+
+dia_peaks <- master_peaks %>% filter(avg_log2FC > 1 & p_val_adj < 0.05 & pct.1 > 0.1 & linked_number > 0)
+
+DefaultAssay(so) <- "ATAC"
+
+cov <- CoveragePlot(
+  object = so,
+  region = dia_peaks$Row.names[1],
+  annotation = FALSE,
+  peaks = FALSE,
+  group.by = "timepoint_group",
+  extend.upstream = 5000,
+  extend.downstream = 1500,
+  links = F
+) + scale_fill_manual(values = timepoint_cols)
+
+gene_plot <- AnnotationPlot(
+  object = so,
+  region = dia_peaks$Row.names[1],
+  extend.upstream = 5000,
+  extend.downstream = 1500,
+)
+p <- CombineTracks(
+  plotlist = list(cov, gene_plot),
+  heights = c(10, 2),
+  widths = c(10)
+)
+
+SaveFigure(p, paste0(dia_peaks$Row.names[1], "_track"), type = "pdf", height = 5, width = 5)
+
+```
+

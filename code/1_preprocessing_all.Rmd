@@ -15,10 +15,15 @@ suppressPackageStartupMessages({
   library(BSgenome.Nfurzeri.NCBI.NfurGRZ.RIMD1)
   library(Signac)
   library(tidyverse)
-  library(dplyr)
   library(scDblFinder)
 })
 
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+#Set Out Directories
+outs_dir <- "../results_all/"
+fig_path <- "../results_all/figures/"
 ```
 
 ## Filepaths for CellRangerArc-aggr Outputs
@@ -26,62 +31,17 @@ suppressPackageStartupMessages({
 use relative paths
 
 ```{r}
-# # nov24 aggregated
-# filtered_path <- "../2024_10_31_Cellranger_Outs/aggr/filtered_feature_bc_matrix.h5"
-# raw_path <- "../2024_10_31_Cellranger_Outs/aggr/raw_feature_bc_matrix.h5"
-# fragments_path <- "../2024_10_31_Cellranger_Outs/aggr/atac_fragments.tsv.gz"
-# 
-# annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
-# 
-# outs_dir <- "../results_nov24/"
-
-
 # all aggregated
-# filtered_path <- "../aggr_batch1-3/filtered_feature_bc_matrix.h5"
-# raw_path <- "../aggr_batch1-3/raw_feature_bc_matrix.h5"
-# fragments_path <- "../aggr_batch1-3/atac_fragments.tsv.gz"
-# annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
-# 
-# outs_dir <- "../results_all/"
-# fig_path <- "../results_all/figures/"
-# 
-# 
-# #add sample names here in order of aggr library file
-# sample_names <- c("25som_1", "hb_1", "hb_2", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2", "dia1mo_1", "dia3mo_1", "dev1d_1", "dev1d_2", "dev1d_3")
-
-
-# all aggregated rimd1
-filtered_path <- "../rimd1/filtered_feature_bc_matrix.h5"
-raw_path <- "../rimd1/raw_feature_bc_matrix.h5"
-fragments_path <- "../rimd1/atac_fragments.tsv.gz"
-annotation_path <- "../rimd1/GCF_043380555.1_NfurGRZ-RIMD1_genomic_edited.gtf"
-
-outs_dir <- "../results_rimd1/"
-fig_path <- "../results_rimd1/figures/"
+filtered_path <- "../aggr_batch1-3/filtered_feature_bc_matrix.h5"
+raw_path <- "../aggr_batch1-3/raw_feature_bc_matrix.h5"
+fragments_path <- "../aggr_batch1-3/atac_fragments.tsv.gz"
+annotation_path <- "../genome_2015/GCF_001465895.1_Nfu_20140520_genomic_edited.gtf"
 
 
 #add sample names here in order of aggr library file
 sample_names <- c("25som_1", "hb_1", "hb_2", "dia1d_1", "dia2d_1", "dia6d_1", "dia6d_2", "dia1mo_1", "dia3mo_1", "dev1d_1", "dev1d_2", "dev1d_3")
 ```
 
-## Helper Functions
-
-Plot Saving Function
-
-```{r}
-SaveFigure <- function(plots, name, type = "png", width, height, res){
-  if(type == "png") {
-    png(paste0(fig_path, name, ".", type),
-      width = width, height = height, units = "in", res = 200)
-  } else {
-    pdf(paste0(fig_path, name, ".", type),
-      width = width, height = height)
-  }
-  print(plots)
-  dev.off()
-  print(plots)
-}
-```
 
 # SoupX Ambient RNA Removal
 

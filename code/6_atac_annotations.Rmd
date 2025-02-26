@@ -1,0 +1,255 @@
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+  library(Polychrome)
+})
+
+#import helper functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+#set output and figure directories
+outs_dir <- "../results_all/"
+fig_dir <- "../results_all/figures/"
+```
+
+# Find Markers
+```{r}
+#read in seurat object and find markers for atac clusters
+so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
+DefaultAssay(so) <- "ATAC"
+atac_markers <- FindAllMarkers(so, assay = "gene_activity", group.by = "ATAC_snn_res.0.8", only.pos = T)
+```
+
+
+# Save Markers to file
+```{r}
+atac_markers$gene_name <- translate(atac_markers$gene)
+atac_markers$gene_name <- paste0(atac_markers$gene,
+                                  " (", atac_markers$gene_name, ")")
+
+top_atac_markers <- atac_markers %>%
+  filter(avg_log2FC > 0.5) %>%
+  group_by(cluster) %>%
+  arrange(p_val_adj) %>%
+  slice_head(n = 20) %>%
+  mutate(rank = row_number()) %>%
+  select(cluster, rank, gene_name) %>%
+  pivot_wider(names_from = cluster, values_from = gene_name, names_prefix = "Cluster_", values_fill = list(gene_name = "")) %>%
+  arrange(rank) %>%
+  select(-rank)
+
+write.csv(top_atac_markers,
+          paste0(outs_dir, "top_atac_markers.csv"))
+
+```
+
+# Add annotations to seurat Object
+```{r}
+cluster.ids <- c(
+  'brain_1',
+  'spinal_cord_1',
+  'neuron_1',
+  'midbrain_hindbrain',
+  'myotome/muscle_1',
+  'neuron_progenitor_1',
+  'somite_1',
+  'somite_2',
+  'telencephalon/optic_cup_1',
+  'neuron_progenitor_2',
+  'epidermal',
+  'spinal_cord_2',
+  'telencephalon/optic_cup_2',
+  'spinal_cord_3',
+  'telencephalon/optic_cup_3',
+  'neuron_progenitor_3',
+  'spinal_cord_4',
+  'unknown',
+  'head_kidney',
+  'hatching_gland',
+  'midbrain_hindbrain_pax2/5_en1/2',
+  'brain_2',
+  'periderm',
+  'endothelial',
+  'primitive_gut',
+  'floor_plate',
+  'spinal_cord_5',
+  'neural_crest',
+  'blood',
+  'otic_vesicle',
+  'neuron_dscam',
+  'neuron_neurod1',
+  'telencephalon/optic_cup_4',
+  'myotome/muscle_2'
+)
+
+cluster.ids.broad <- c(
+  'brain',
+  'spinal_cord',
+  'neuron',
+  'midbrain_hindbrain',
+  'myotome/muscle',
+  'neuron_progenitor',
+  'somite',
+  'somite',
+  'telencephalon/optic_cup',
+  'neuron_progenitor',
+  'epidermal',
+  'spinal_cord',
+  'telencephalon/optic_cup',
+  'spinal_cord',
+  'telencephalon/optic_cup',
+  'neuron_progenitor',
+  'spinal_cord',
+  'unknown',
+  'head_kidney',
+  'hatching_gland',
+  'midbrain_hindbrain',
+  'brain',
+  'periderm',
+  'endothelial',
+  'primitive_gut',
+  'floor_plate',
+  'spinal_cord',
+  'neural_crest',
+  'blood',
+  'otic_vesicle',
+  'neuron_dscam',
+  'neuron_neurod1',
+  'telencephalon/optic_cup',
+  'myotome/muscle'
+)
+
+Idents(so) <- "ATAC_snn_res.0.8"
+names(cluster.ids) <- levels(so)
+so <- RenameIdents(so, cluster.ids)
+so$annotation_ATAC <- Idents(so)
+
+Idents(so) <- "ATAC_snn_res.0.8"
+names(cluster.ids.broad) <- levels(so)
+so <- RenameIdents(so, cluster.ids.broad)
+so$annotation_ATAC_broad <- Idents(so)
+```
+
+# Save Seurat Object
+```{r}
+saveRDS(so, paste0(outs_dir, "so_dual_annotated.rds"))
+```
+
+# Plotting
+```{r}
+so <- readRDS(paste0(outs_dir, "so_dual_annotated.rds"))
+
+p <- DimPlot(so, label = T, repel = T, reduction = "umap_ATAC", group.by = "annotation_ATAC") + NoLegend()
+SaveFigure(p, path = "umap_annotated_ATAC",
+           height = 10, width = 10)
+
+p <- DimPlot(so, label = T, repel = T, reduction = "umap_ATAC", group.by = "annotation_ATAC_broad")
+SaveFigure(p, path = "umap_annotated_ATAC_broad",
+           height = 10, width = 10)
+```
+
+```{r}
+colors = palette36.colors(28)
+colors <- sortByHue(colors)
+names(colors) <- levels(so$annotation_broad)
+
+colors <- c(colors,
+            'midbrain_hindbrain' = '#2ED9FF',
+            'brain' = '#3283FE',
+            'floor_plate' = '#00CD00')
+
+colors <- 
+
+p <- DimPlot(so, label = F, repel = T, reduction = "umap_ATAC", group.by = "annotation_ATAC_broad", cols = colors) + NoLegend()
+SaveFigure(p, path = "umap_annotated_ATAC_broad",
+           height = 10, width = 10)
+
+
+p <- DimPlot(so, label = F, repel = T, reduction = "umap", group.by = "annotation_broad", cols = colors) + NoLegend()
+SaveFigure(p, path = "umap_annotated_RNA_broad",
+           height = 10, width = 10)
+
+p <- DimPlot(so, label = F, repel = T, reduction = "umap", group.by = "annotation_broad", cols = colors)
+SaveFigure(p, path = "legend",
+           height = 10, width = 10)
+```
+
+
+
+```{r}
+library(ComplexHeatmap)
+library(reshape2)
+
+cont <- table(so$annotation_broad, so$annotation_ATAC_broad)
+mat <- as.matrix(cont)
+
+rna_order <- levels(forcats::fct_rev(so$annotation_broad))
+atac_order <- c(
+  'myotome/muscle',
+  'head_kidney',
+  'somite',
+  'endothelial',
+  'blood',
+  'neuron_dscam',
+  'neuron_neurod1',
+  'neuron',
+  'spinal_cord',
+  'floor_plate',
+  'neuron_progenitor',
+  'brain',
+  'midbrain_hindbrain',
+  'telencephalon/optic_cup',
+  'epidermal',
+  'neural_crest',
+  'periderm',
+  'otic_vesicle',
+  'primitive_gut',
+  'hatching_gland',
+  'unknown'
+)
+
+# Function to compute F1 score
+calculate_f1 <- function(TP, FP, FN) {
+  precision <- TP / (TP + FP)
+  recall <- TP / (TP + FN)
+  f1_score <- 2 * (precision * recall) / (precision + recall)
+  return(f1_score)
+}
+
+# Initialize matrix to store F1 scores
+f1_matrix <- matrix(0, nrow = nrow(cont), ncol = ncol(cont))
+rownames(f1_matrix) <- rownames(cont)
+colnames(f1_matrix) <- colnames(cont)
+
+# Calculate F1 score for each combination
+for (i in 1:nrow(cont)) {
+  for (j in 1:ncol(cont)) {
+    TP <- cont[i, j]
+    FP <- sum(cont[i, ]) - TP
+    FN <- sum(cont[, j]) - TP
+    f1_matrix[i, j] <- calculate_f1(TP, FP, FN)
+  }
+}
+
+f1_matrix[is.nan(f1_matrix)] <- 0
+
+p <- Heatmap(f1_matrix, 
+        name = "F1 score",
+        col = colorRampPalette(c("white", "#FF4500"))(50),
+        row_title = "RNA Annotation", 
+        column_title = "ATAC Annotation",
+        row_order = rna_order,
+        column_order = atac_order, 
+        cluster_rows = F,
+        cluster_columns = F,
+        column_names_rot = 45,
+        row_names_side = "left",
+        column_title_side = "bottom")
+
+SaveFigure(p, "annotation_F1_heatmap", width = 8, height = 6)
+
+```
+
