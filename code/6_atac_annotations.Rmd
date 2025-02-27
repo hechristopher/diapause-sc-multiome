@@ -253,3 +253,34 @@ SaveFigure(p, "annotation_F1_heatmap", width = 8, height = 6)
 
 ```
 
+#WNN
+```{r}
+so <- readRDS(paste0(outs_dir, "so_dual_annotated.rds"))
+```
+
+```{r}
+
+# build a joint neighbor graph using both assays
+so <- FindMultiModalNeighbors(
+  object = so,
+  reduction.list = list("pca", "lsi"), 
+  dims.list = list(1:30, 1:30),
+  verbose = TRUE
+)
+
+# build a joint UMAP visualization
+so <- RunUMAP(
+  object = so,
+  nn.name = "weighted.nn",
+  assay = "RNA",
+  reduction.name = "umap_wnn",
+  verbose = TRUE
+)
+
+
+DimPlot(so, reduction = "umap_wnn", label = T, cols = colors_broad) + NoLegend()
+DimPlot(so, reduction = "umap_wnn", group.by = "timepoint_group")
+
+saveRDS(so, "../results_all/so_wnn.rds")
+```
+

@@ -5,7 +5,6 @@ suppressPackageStartupMessages({
   library(SeuratWrappers)
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(tidyverse) 
-  library(glmnet)
 })
 
 
@@ -23,8 +22,10 @@ so <- RunUMAP(
   object = so,
   nn.name = "weighted.nn",
   assay = "RNA",
-  reduction.name = "umap_wnn"
+  reduction.name = "umap_wnn",
   verbose = TRUE
 )
 
 DimPlot(so, reduction = "umap_wnn") + NoLegend()
+
+saveRDS(so, "../results_all/so_wnn.rds")
