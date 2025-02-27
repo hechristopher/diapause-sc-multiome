@@ -12,5 +12,7 @@ results_all/
 results_batch1-2/
 results_scratch/
 rimd1/
+results_rimd1/
 bulk/
 figures/
+*.wynton*
