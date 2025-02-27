@@ -2,6 +2,21 @@
 
 #### This project contains analysis of single cell multiomic data from multiple timepoints in killifish development.
 
+| Sample   | Cellranger Cell Number | Filtered Cell Number | Barcode Suffix |
+|----------|------------------------|----------------------|----------------|
+| 25som_1  | 10,177                 |                      | -1             |
+| hb_1     | 9,774                  |                      | -2             |
+| hb_2     | 10,510                 |                      | -3             |
+| dia1d_1  | 6,575                  |                      | -4             |
+| dia2d_1  | 10,736                 |                      | -5             |
+| dia6d_1  | 5,993                  |                      | -6             |
+| dia6d_2  | 17,082                 |                      | -7             |
+| dia1mo_1 | 12,245                 |                      | -8             |
+| dia3mo_1 | 7,928                  |                      | -9             |
+| dev1d_1  | 12,501                 |                      | -10            |
+| dev1d_2  | 20,000                 |                      | -11            |
+| dev1d_3  | 12,563                 |                      | -12            |
+
 TODOs:
 
 -   High Priority

@@ -1,0 +1,63 @@
+---
+title: "8_rna_velocity"
+---
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Signac)
+  library(SeuratWrappers)
+  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
+  library(tidyverse)
+})
+
+
+
+#import helper functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+#set output and figure directories
+outs_dir <- "../results_all/diapause_model/"
+fig_dir <- "../results_all/diapause_model/"
+```
+
+
+Note: Couldn't get r version of velocyto to install, so using python version through reticulate. velocyto was installed in the multiome-velocyto conda environment
+```{r}
+reticulate::use_condaenv("multiome-velocyto")
+```
+
+```{python}
+import os
+import scipy
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import scvelo as scv
+import multivelo as mv
+import matplotlib.pyplot as plt
+```
+
+```{python}
+scv.settings.verbosity = 3
+scv.settings.presenter_view = True
+scv.set_figure_params('scvelo')
+pd.set_option('display.max_columns', 100)
+pd.set_option('display.max_rows', 200)
+np.set_printoptions(suppress=True)
+```
+
+```{python}
+adata_rna = sc.read("../aggr_batch1-3/velocyto/velocyto_combined.loom", cache=True)
+# adata_rna.obs_names = [x.split(':')[1][:-1] + '-1' for x in adata_rna.obs_names]
+
+suff = [x.split(':')[0].split('_')[3] for x in adata_rna.obs_names]
+count(suff)
+
+adata_rna.var_names_make_unique()
+```
+```{r}
+library(reticulate)
+table(py$suff)
+```
+
+
