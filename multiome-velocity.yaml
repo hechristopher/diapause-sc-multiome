@@ -59,7 +59,11 @@ dependencies:
   - qttools=6.7.2
   - qtwebchannel=6.7.2
   - qtwebsockets=6.7.2
+<<<<<<< HEAD
   - setuptools=75.8.0
+=======
+  - setuptools=75.8.0=
+>>>>>>> 2868cf4f2a72a8593228b515e6d29472819ef0f2
   - sip=6.10.0
   - six=1.16.0
   - sqlite=3.45.3
