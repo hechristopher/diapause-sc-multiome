@@ -1,4 +1,4 @@
-name: multiome-velocyto
+name: multiome-velocity-analyses
 channels:
   - conda-forge
   - bioconda
@@ -17,7 +17,6 @@ dependencies:
   - freetype=2.12.1
   - h5py=3.12.1
   - hdf5=1.14.5
-  - icc_rt=2022.1.0
   - icu=73.1
   - intel-openmp=2023.1.0
   - joblib=1.4.2
@@ -68,8 +67,6 @@ dependencies:
   - tk=8.6.14
   - tornado=6.4.2
   - unicodedata2=15.1.0
-  - vc=14.42
-  - vs2015_runtime=14.42.34433
   - wheel=0.45.1
   - xz=5.6.4
   - zlib=1.2.13
@@ -155,8 +152,6 @@ dependencies:
       - pynndescent==0.5.13
       - python-json-logger==3.2.1
       - pytz==2025.1
-      - pywin32==308
-      - pywinpty==2.0.15
       - pyyaml==6.0.2
       - pyzmq==26.2.1
       - referencing==0.36.2

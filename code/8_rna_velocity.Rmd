@@ -8,7 +8,6 @@ suppressPackageStartupMessages({
   library(SeuratWrappers)
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(tidyverse)
-  library(reticulate)
 })
 
 
@@ -56,6 +55,7 @@ gc()
 Note: Using python version through reticulate. scVelo and multiVelo were installed in the multiome-velocyto conda environment
 ```{r}
 reticulate::use_condaenv("multiome-velocyto")
+library(reticulate)
 ```
 
 ```{python}
@@ -127,8 +127,9 @@ adata_atac = mv.aggregate_peaks_10x(adata_atac,
                                     '../aggr_batch1-3/feature_linkage.bedpe')
                                     
 ```
+
 ```{python}
-adata_atac_X_copy = adata_atac.X.A
+
 ```
 
 ```{python}
