@@ -28,20 +28,21 @@ timepoint_cols <- c("#E496EF","#800080", "#C6DBEF", "#C6DBEF", "#6BAED6", "#2171
 
 #RNA UMAPs
 p1 <- DimPlot(so, group.by = "annotation_broad", reduction = "umap", label = F, cols = colors_broad) + NoLegend() + NoAxes()
-SaveFigure(p1, "1B_umap_annot_rna", type = "pdf", width = 10, height = 10)
+SaveFigure(p1, "1B_umap_annot_rna", type = "png", width = 10, height = 10, res = 300)
 
 p2 <- DimPlot(so, group.by = "timepoint", reduction = "umap", label = F, cols = timepoint_cols) + NoLegend() + NoAxes()
-SaveFigure(p2, "1B_umap_timepoint_rna", type = "pdf", width = 10, height = 10)
+SaveFigure(p2, "1B_umap_timepoint_rna", type = "png", width = 10, height = 10, res = 300)
 
 #ATAC UMAPs
 p3 <- DimPlot(so, group.by = "annotation_ATAC_broad", reduction = "umap_ATAC", label = F, cols = colors_broad) + NoLegend() + NoAxes()
-SaveFigure(p3, "1B_umap_annot_atac", type = "pdf", width = 10, height = 10)
+SaveFigure(p3, "1B_umap_annot_atac", type = "png", width = 10, height = 10, res = 300)
 
 p4 <- DimPlot(so, group.by = "timepoint", reduction = "umap_ATAC", label = F, cols = timepoint_cols) + NoLegend() + NoAxes()
-SaveFigure(p4, "1B_umap_timepoint_atac", type = "pdf", width = 10, height = 10)
+SaveFigure(p4, "1B_umap_timepoint_atac", type = "png", width = 10, height = 10, res = 300)
 ```
 # Figure 1C
 ```{r}
+#rna dot plot
 marker_genes_final <- c(
   'col5a1',
   'junb (1 of 2)',
@@ -72,14 +73,42 @@ marker_genes_final <- c(
   'clec10a (1 of 4)'
 )
 
-marker_genes <- translate(marker_genes, from = "N. furzeri Final Symbol", to = "N. furzeri (NCBI)")
+marker_genes <- translate(marker_genes_final, from = "N. furzeri Final Symbol", to = "N. furzeri (NCBI)")
 DefaultAssay(so) <- "RNA"
 p <- DotPlot(so, features = marker_genes, group.by = "annotation_broad") + RotatedAxis() + scale_x_discrete(labels=marker_genes_final)
-SaveFigure(p, "1C_marker_dotplot", type = "pdf", width = 15, height = 8)
+SaveFigure(p, "1C_marker_dotplot", type = "png", width = 15, height = 8, res = 300)
+```
 
 
-p <- DotPlot(so, features = marker_genes, assay = "gene_activity", group.by = "annotation_broad") + RotatedAxis() + scale_x_discrete(labels=marker_genes_final)
-SaveFigure(p, "1C_marker_dotplot_gene_activity", type = "pdf", width = 15, height = 8)
+```{r}
+#atac dotplot
+marker_genes_final <- c(
+  'ptprn2 (2 of 3)',
+  'hoxb2 (2 of 2)', 
+  'dscaml1 (1 of 2)',
+  'pax3 (2 of 2)',
+  'bmpr1b (1 of 2)',
+  'sox2 (2 of 3)',
+  'adgra2',
+  'cadps2',
+  'mnat1',
+  'prpsap1 (1 of 2)',
+  'angpt1 (2 of 2)',
+  'dgkk',
+  'wnt6',
+  'tgfbr3 (2 of 3)',
+  'rbm47',
+  'inpp5a (1 of 2)',
+  'sox10 (2 of 2)',
+  'sptb',
+  'otol1 (2 of 3)',
+  'dscam (1 of 5)',
+  'neurod1'
+)
+marker_genes <- translate(marker_genes_final, from = "N. furzeri Final Symbol", to = "N. furzeri (NCBI)")
+
+p <- DotPlot(so, features = marker_genes, assay = "gene_activity", group.by = "annotation_ATAC_broad") + RotatedAxis() + scale_x_discrete(labels=marker_genes_final)
+SaveFigure(p, "1C_marker_dotplot_gene_activity", type = "png", width = 15, height = 8, res = 300)
 
 ```
 # Figure 1D - umaps split by timetpoint
@@ -106,9 +135,9 @@ result <- lapply(sample_lists, function(x) {
 
 for(i in 1:8){
   p <- DimPlot(so, group.by = "annotation_broad", cells.highlight = result[[i]],
-                             cols.highlight = colors_broad,
+                             cols.highlight = "blue",
                              reduction = "umap", label = F, cols = "grey") + NoLegend() + NoAxes()
-  SaveFigure(p, paste0("1D_", levels(so$timepoint)[i], "_umap"), type = "pdf", width = 10, height = 10)
+  SaveFigure(p, paste0("1D_", levels(so$timepoint)[i], "_umap"), type = "png", width = 10, height = 10, res = 300)
 
 }
 ```

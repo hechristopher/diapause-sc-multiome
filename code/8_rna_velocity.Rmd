@@ -21,29 +21,43 @@ fig_dir <- "../results_all/"
 ```
 #Load Seurat Object
 ```{r}
-so <- readRDS("../results_all/so_wnn.rds")
+so <- readRDS("../results_all/so_neurons.rds")
 ```
 
 
 ```{r}
 so$barcode <- colnames(so)
-so$UMAP_1 <- so@reductions$umap@cell.embeddings[,1]
-so$UMAP_2 <- so@reductions$umap@cell.embeddings[,2]
-so$UMAP_wnn_1 <- so@reductions$umap_wnn@cell.embeddings[,1]
-so$UMAP_wnn_2 <- so@reductions$umap_wnn@cell.embeddings[,2]
+so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
+so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
+so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
+so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
+so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
+so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
 
+# write metadata
 write.csv(so@meta.data, file=paste0(outs_dir, 'metadata.csv'), quote=F, row.names=F)
+
+# write dimesnionality reduction matrix, in this example case pca matrix
+write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, 'pca.csv'), quote=F, row.names=F)
+
+# extract neighborhood graph
+nn_idx <- so@neighbors$weighted.nn@nn.idx
+nn_dist <- so@neighbors$weighted.nn@nn.dist
+nn_cells <- so@neighbors$weighted.nn@cell.names
+
+# save neighborhood graph
+write.table(nn_idx, paste0(outs_dir, "nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+write.table(nn_dist, paste0(outs_dir, "nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+write.table(nn_cells, paste0(outs_dir, "nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
 
 rm(so)
 gc()
+
 # # write expression counts matrix
 # library(Matrix)
 # counts_matrix <- GetAssayData(seurat_obj, assay='RNA', slot='counts')
 # writeMM(counts_matrix, file=paste0(out_data_dir, 'counts.mtx'))
-# 
-# # write dimesnionality reduction matrix, in this example case pca matrix
-# write.csv(seurat_obj@reductions$pca@cell.embeddings, file='pca.csv'), quote=F, row.names=F)
-# 
+#
 # # write gene names
 # write.table(
 #   data.frame('gene'=rownames(counts_matrix)),file='gene_names.csv',
@@ -80,7 +94,7 @@ pd.set_option('display.max_rows', 200)
 np.set_printoptions(suppress=True)
 ```
 
-## Reading in unspliced and spliced counts
+## Reading in unspliced and spliced counts
 ```{python}
 adata_rna = sc.read("../aggr_batch1-3/velocyto/velocyto_combined.loom", cache=True)
 
@@ -93,49 +107,133 @@ adata_rna.obs_names = [a + b for a, b in zip(adata_rna.obs_names, suffixes)]
 ```
 
 ```{python}
-#read in metadata table from seurat object
+#read in metadata and pca table from seurat object
 cell_meta = pd.read_csv("../results_all/metadata.csv")
 
 #filter barcodes in seurat object
-barcodes = cell_meta['barcode']
+barcodes = cell_meta.barcode
 adata_rna = adata_rna[adata_rna.obs_names.isin(barcodes)].copy()
 
-#add metadata to adata object
+#reorder metadata in order of adata
+cell_meta = cell_meta.iloc[pd.Index(cell_meta['barcode']).get_indexer(adata_rna.obs_names)] 
+
+#read in pca
+pca = pd.read_csv("../results_all/pca.csv")
+pca = pca.loc[cell_meta.index] # reorder pca in order of adata
+
+#add metadata to adata
+cell_meta = cell_meta.set_index('barcode')
 adata_rna.obs = cell_meta
+
+
+# set pca and umap
+adata_rna.obsm['X_pca'] = pca.to_numpy()
+adata_rna.obsm['X_umap'] = np.vstack((adata_rna.obs['umap.rna_1'].to_numpy(), adata_rna.obs['umap.rna_2'].to_numpy())).T
+```
+
+
+```{python}
+#plot umap
+sc.pl.umap(adata_rna, color=['timepoint_group'], frameon=False)
 ```
 
 ```{python}
-# Top 1000 variable genes are used for downstream analyses.
-scv.pp.filter_and_normalize(adata_rna, min_shared_counts=10, n_top_genes=1000)
+# Top 2000 variable genes are used for downstream analyses.
+scv.pp.filter_and_normalize(adata_rna, min_shared_counts=10, n_top_genes=2000)
+```
+
+
+##Preprocessing the ATAC counts (Done on wynton)
+```{python}
+# adata_atac = sc.read_10x_mtx('../aggr_batch1-3/filtered_feature_bc_matrix/', var_names='gene_symbols', cache=True, gex_only=False)
+# adata_atac = adata_atac[:,adata_atac.var['feature_types'] == "Peaks"]
 ```
 
 ```{python}
-# subset dev cells
-adata_dev = adata_rna[adata_rna.obs['timepoint_group'].isin(['dev'])]
-adata_dev
+# adata_atac = mv.aggregate_peaks_10x(adata_atac,
+#                                     '../aggr_batch1-3/atac_peak_annotation.tsv',
+#                                     '../aggr_batch1-3/feature_linkage.bedpe')
+#                                     
 ```
-
-##Preprocessing the ATAC counts
+## Read in results from wynton
 ```{python}
-adata_atac = sc.read_10x_mtx('../aggr_batch1-3/filtered_feature_bc_matrix/', var_names='gene_symbols', cache=True, gex_only=False)
-adata_atac = adata_atac[:,adata_atac.var['feature_types'] == "Peaks"]
-```
-
-```{python}
-adata_atac = mv.aggregate_peaks_10x(adata_atac,
-                                    '../aggr_batch1-3/atac_peak_annotation.tsv',
-                                    '../aggr_batch1-3/feature_linkage.bedpe')
-                                    
+adata_atac = sc.read_h5ad('../results_all/adata_atac.h5ad')
 ```
 
 ```{python}
+plt.hist(adata_atac.X.sum(1), bins=100, range=(0, 100000))
+plt.show()
+```
 
+
+```{python}
+#barcodes from seurat object
+adata_atac = adata_atac[adata_atac.obs_names.isin(barcodes)].copy()
+adata_atac.obs_names
+```
+# We normalize aggregated peaks with TF-IDF.
+```{python}
+mv.tfidf_norm(adata_atac)
+```
+
+#Finding shared barcodes and features between RNA and ATAC
+```{python}
+shared_genes = pd.Index(np.intersect1d(adata_rna.var_names, adata_atac.var_names))
+shared_cells = pd.Index(np.intersect1d(adata_rna.obs_names, adata_atac.obs_names))
+len(shared_genes), len(shared_cells)
+```
+```{python}
+adata_rna = adata_rna[shared_cells, shared_genes]
+adata_atac = adata_atac[shared_cells, shared_genes]
 ```
 
 ```{python}
-plt.hist(adata_atac.X.sum(1), bins=100, range=(0, 100000));
+scv.pp.normalize_per_cell(adata_rna)
+scv.pp.log1p(adata_rna)
+scv.pp.moments(adata_rna, n_pcs=30, n_neighbors=50)
+```
+```{python}
+sc.pl.umap(adata_rna, color=['annotation_broad'], frameon=False, legend_loc='on data')
 ```
 
+
+```{python}
+scv.pl.proportions(adata_rna, groupby='annotation_broad')
+```
+```{python}
+scv.tl.velocity(adata_rna, mode='stochastic')
+scv.tl.velocity_graph(adata_rna)
+```
+```{python}
+scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='annotation_broad', save='embedding_grid.pdf', title='', scale=0.25)
+scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color='annotation_broad', save='embedding_stream.pdf', title='')
+```
+# Smoothing gene aggregagted peaks by neighbors
+```{python}
+nn_idx = np.loadtxt("../results_all/nn_idx.txt", delimiter=',')
+nn_dist = np.loadtxt("../results_all/nn_dist.txt", delimiter=',')
+nn_cells = pd.Index(pd.read_csv("../results_all/nn_cells.txt", header=None)[0])
+
+np.all(nn_cells == adata_atac.obs_names)
+```
+```{python}
+mv.knn_smooth_chrom(adata_atac, nn_idx, nn_dist)
+```
+
+# Running multi-omic dynamical model
+```{python}
+adata_result = mv.recover_dynamics_chrom(adata_rna,
+                                         adata_atac,
+                                         max_iter=5,
+                                         init_mode="invert",
+                                         parallel=True,
+                                         save_plot=False,
+                                         rna_only=False,
+                                         fit=True,
+                                         n_anchors=500,
+                                         extra_color_key='annotation_broad'
+                                        )
+```
 
 
 ```{r}

@@ -36,9 +36,9 @@ DefaultAssay(so) <- "RNA"
 p <- DoHeatmap(so, cells = (seq(1, 80000, 50)),
                features = c(dia_genes$gene, dev_genes$gene),
                group.by = "timepoint_group", group.colors = timepoint_cols,
-               slot = "data"
+               slot = "data", disp.max = 2, disp.min = -2,
 ) + scale_y_discrete(labels=rev(translate(c(dia_genes$gene, dev_genes$gene))))
-SaveFigure(p, "global_diadev_heatmap", type = "pdf", width = 10, height = 10)
+SaveFigure(p, "global_diadev_heatmap", type = "png", width = 10, height = 10, res = 300)
 ```
 
 ```{r}
@@ -48,6 +48,25 @@ for(gene in diapause_genes){
   SaveFigure(p, paste0(translate(gene), "_featureUMAP"), type = "pdf", width = 5, height = 5)
 }
 ```
+#Global DA
+```{r}
+timepoint_cols <- c("#E496EF","#C6DBEF", "#2171B5", "#08306B", "#FD8D3C")
+
+master_peaks <- read.csv("../results_all/master_peaks.csv", row.names = 1)
+dia_peaks <- master_peaks %>% filter(avg_log2FC > 1 & p_val_adj < 0.05 & pct.1 > 0.1)
+dev_peaks <- master_peaks %>% filter(avg_log2FC < 0 & p_val_adj < 0.05 & pct.1 > 0.1)
+
+
+DefaultAssay(so) <- "ATAC"
+# so <- ScaleData(so, features = rownames(so))
+p <- DoHeatmap(so, cells = (seq(1, 80000, 50)),
+               features = c(dia_peaks$Row.names, dev_peaks$Row.names),
+               group.by = "timepoint_group", group.colors = timepoint_cols, slot = "data",
+               disp.max = 1)
+SaveFigure(p, "global_diadev_peak_heatmap", type = "png", width = 10, height = 10, res = 300)
+
+```
+
 ```{r}
 master_peaks <- read.csv("../results_all/master_peaks.csv", row.names = 1)
 
