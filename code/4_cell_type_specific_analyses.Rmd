@@ -18,408 +18,625 @@ source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/cod
 
 #Set Out Directories
 outs_dir <- "../results_all/"
-fig_path <- "../results_all/figures/"
+fig_dir <- "../results_all/figures/"
 ```
 
 ## Import Seurat Object
 
 ```{r}
-so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
-
-# saveRDS(so, paste0(outs_dir, "/so_annotated_atac_processed.rds"))
-
-```
-
-# Differential Expression and Differential Peak Testing
-
-## Compute Global and Cell Type Dia/Dev Genes
-
-Cell Types to Compare
-
-| Cluster                       | Dia \# | Dev \# | Pre Dia \# |
-|-------------------------------|--------|--------|------------|
-| Global                        | 39577  | 31131  | 19339      |
-| blood                         | 727    | 287    | 338        |
-| endothelial                   | 903    | 405    | 543        |
-| MB/HB pax2/5                  | 1340   | 945    | 614        |
-| Spinal Cord                   | 4156   | 2621   | 2475       |
-| Telencephalon                 | 1898   | 1241   | 1376       |
-| Progenitor Neuron             | 18039  | 10024  | 3933       |
-| Differentiating/Mature Neuron | 2153   | 5450   | 1049       |
-| Epidermal                     | 2504   | 1700   | 912        |
-| Hatching Gland                | 1186   | 353    | 703        |
-| Somite                        | 2800   | 3241   | 1774       |
-| Myotome/Muscle                | 1435   | 1368   | 1773       |
-
-First, we split barcodes into dia/dev for each cell type
-
-```{r}
-#Get Cell Barcodes for each group
-all_dia <- WhichCells(so, expression = devtraj == "dia")
-all_dev <- WhichCells(so, expression = devtraj != "dia")
-
-blood_dia <- WhichCells(
-  so,expression = annotation_broad == "blood" & devtraj == "dia")
-blood_dev <- WhichCells(
-  so,expression = annotation_broad == "blood" & devtraj != "dia")
-
-endothelial_dia <- WhichCells(
-  so,expression = annotation_broad == "endothelial" & devtraj == "dia")
-endothelial_dev <- WhichCells(
-  so,expression = annotation_broad == "endothelial" & devtraj != "dia")
-
-mbhb_dia <- WhichCells(
-  so,expression = annotation_broad == "midbrain_hindbrain_pax2/5_en1/2" & devtraj == "dia")
-mbhb_dev <- WhichCells(
-  so,expression = annotation_broad == "midbrain_hindbrain_pax2/5_en1/2" & devtraj != "dia")
-
-spinalcord_dia <- WhichCells(
-  so,expression = annotation_broad == "spinal_cord" & devtraj == "dia")
-spinalcord_dev <- WhichCells(
-  so,expression = annotation_broad == "spinal_cord" & devtraj != "dia")
-
-telencephalon_dia <- WhichCells(
-  so,expression = annotation_broad == "telencephalon/optic_cup" & devtraj == "dia")
-telencephalon_dev <- WhichCells(
-  so,expression = annotation_broad == "telencephalon/optic_cup" & devtraj != "dia")
-
-neuprog_dia <- WhichCells(
-  so,expression = annotation_broad == "neuron_progenitor" & devtraj == "dia")
-neuprog_dev <- WhichCells(
-  so,expression = annotation_broad == "neuron_progenitor" & devtraj != "dia")
-
-neuron_dia <- WhichCells(
-  so,expression = (annotation_broad == "differentiating_neuron" | annotation_broad == "neuron") & devtraj == "dia")
-neuron_dev <- WhichCells(
-  so,expression = (annotation_broad == "differentiating_neuron" | annotation_broad == "neuron") & devtraj != "dia")
-
-epidermal_dia <- WhichCells(
-  so,expression = annotation_broad == "epidermal" & devtraj == "dia")
-epidermal_dev <- WhichCells(
-  so,expression = annotation_broad == "epidermal" & devtraj != "dia")
-
-hatch_dia <- WhichCells(
-  so,expression = annotation_broad == "hatching_gland" & devtraj == "dia")
-hatch_dev <- WhichCells(
-  so,expression = annotation_broad == "hatching_gland" & devtraj != "dia")
-
-somite_dia <- WhichCells(
-  so,expression = annotation_broad == "somite" & devtraj == "dia")
-somite_dev <- WhichCells(
-  so,expression = annotation_broad == "somite" & devtraj != "dia")
-
-myotome_dia <- WhichCells(
-  so,expression = annotation_broad == "myotome/muscle" & devtraj == "dia")
-myotome_dev <- WhichCells(
-  so,expression = annotation_broad == "myotome/muscle" & devtraj != "dia")
-```
-
-Next, we compute DE between dia and dev for each group
-
-```{r}
-compute_DE <- function(dia, dev){
-  #compute DE genes
-  DefaultAssay(so) <- "RNA"
-  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev, min.pct = 0.1)
-  
-  #add gene names as row, adding our annotations
-  df$gene <- rownames(df)
-  df$gene_name <- translate(df$gene)
-  df$gene_name <- paste0(df$gene," (", df$gene_name, ")")
-
-  #annotate with dia/dev up
-  df$DE <- NA
-  df$DE[df$avg_log2FC < -2 & df$p_val_adj < 0.05] <- "Dev Up"
-  df$DE[df$avg_log2FC > 2 & df$p_val_adj < 0.05] <- "Dia Up"
-  return(df)
-}
-
-global_DE <- compute_DE(all_dia, all_dev)
-blood_DE <- compute_DE(blood_dia, blood_dev)
-endothelial_DE <- compute_DE(endothelial_dia, endothelial_dev)
-mbhb_DE <- compute_DE(mbhb_dia, mbhb_dev)
-spinalcord_DE <- compute_DE(spinalcord_dia, spinalcord_dev)
-telencephalon_DE <- compute_DE(telencephalon_dia, telencephalon_dev)
-neuprog_DE <- compute_DE(neuprog_dia, neuprog_dev)
-neuron_DE <- compute_DE(neuron_dia, neuron_dev)
-epidermal_DE <- compute_DE(epidermal_dia, epidermal_dev)
-hatch_DE <- compute_DE(hatch_dia, hatch_dev)
-somite_DE <- compute_DE(somite_dia, somite_dev)
-myotome_DE <- compute_DE(myotome_dia, myotome_dev)
+so <- readRDS(paste0(outs_dir, "so_wnn.rds"))
 ```
 
 ```{r}
-library(UpSetR)
-upset <- list(
-  global = global_DE[global_DE$DE == "Dia Up", "gene"],
-  blood = blood_DE[blood_DE$DE == "Dia Up", "gene"],
-  endothelial = endothelial_DE[endothelial_DE$DE == "Dia Up", "gene"],
-  mbhb = mbhb_DE[mbhb_dia_DE$DE == "Dia Up", "gene"],
-  telenceaphalon = telencephalon_DE[telencephalon_DE$DE == "Dia Up", "gene"],
-  neuprog = neuprog_DE[neuprog_DE$DE == "Dia Up", "gene"],
-  neuron = neuron_DE[neuron_DE$DE == "Dia Up", "gene"],
-  epidermal = epidermal_DE[epidermal_DE$DE == "Dia Up", "gene"],
-  hatchinggland = hatch_DE[hatch_DE$DE == "Dia Up", "gene"],
-  somite = somite_DE[somite_DE$DE == "Dia Up", "gene"],
-  myotome = myotome_DE[myotome_DE$DE == "Dia Up", "gene"]
+#try regressing out mitochondrial
+
+```
+
+# Function for performing global and cell type specific DE/DA with parameters
+
+-   min_cell_number: minimum number of cells per group
+-   timepoints_1, timepoints_2: timepoints to compare
+-   downsample_to: number of cells to downsample to
+-   assay: either "RNA" or "ATAC"
+
+```{r}
+#function for cell global and cell type DE (dia vs dev)
+GlobalCelltypeDiaDE <- function(
+    min_cell_number,
+    timepoints_1 = c("dia6d", "dia1mo"),
+    timepoints_2 = c("hb", "dev1d"),
+    output_columns = c("pct.1", "pct.2","avg_log2FC", "p_val_adj"),
+    downsample_to = F,
+    assay = "RNA",
+    seed = NULL
 )
-
-sets_to_include <- c("global", "neuprog", "neuron",
-           "epidermal", "hatchinggland", "somite", "myotome")
-
-
-intersections = list(
-  list("neuprog"), list("neuron"), list("epidermal"),
-  list("hatchinggland"), list("somite"), list("myotome"),
-  list("blood"),
-  list("global", "neuprog", "neuron",
-       "epidermal", "hatchinggland", "somite", "myotome", "blood"),
-  list("neuprog", "neuron"),
-  list("somite", "myotome"),
-  list("epidermal", "somite", "myotome"),
-  list("epidermal", "neuprog", "neuron"),
-  list("somite", "neuprog", "neuron"),
-  list("epidermal", "neuprog", "neuron"),
-  list("global","epidermal", "neuprog", "neuron", "somite", "myotome"),
-  list("global","blood", "neuprog", "neuron", "somite", "myotome")
-)
-
-UpSetR::upset(
-  fromList(upset),
-  intersection = intersections,
-  queries = list(
-    list(query = intersects,
-         params = list("global", "neuprog", "neuron",
-                       "epidermal", "hatchinggland", "somite", "myotome", "blood"),
-         color = "blue", active = T),
-    list(query = intersects,
-         params = list("global","epidermal", "neuprog", "neuron", "somite", "myotome"),
-         color = "blue", active = T),
-    list(query = intersects,
-         params = list("global","blood", "neuprog", "neuron", "somite", "myotome"),
-         color = "blue", active = T),
-    list(query = intersects, params = list("neuprog"),
-         color = "green", active = T),
-    list(query = intersects, params = list("neuron"),
-         color = "green", active = T),
-    list(query = intersects, params = list("epidermal"),
-         color = "green", active = T),
-    list(query = intersects, params = list("hatchinggland"),
-         color = "green", active = T),
-    list(query = intersects, params = list("somite"),
-         color = "green", active = T),
-    list(query = intersects, params = list("myotome"),
-         color = "green", active = T),
-    list(query = intersects, params = list("blood"),
-         color = "green", active = T)
-  )
-)
-
-```
-
-```{r}
-# Install necessary packages if not already installed
-
-library(VennDiagram)
-library(ggplot2)
-
-celltypes <- c("global", "blood", "endothelial", "mbhb", "telencephalon", "neuprog", "neuron", "epidermal", "hatching gland", "somite", "myotome")
-
-
-# List of all sets
-gene_sets <- upset
-
-# Convert lists to sets
-gene_sets <- lapply(gene_sets, unique)
-
-# Calculate unique genes for each set and store them
-unique_genes <- lapply(seq_along(gene_sets), function(i) {
-  setdiff(gene_sets[[i]], unlist(gene_sets[-i]))
-})
-
-# Print unique genes for each set
-for (i in seq_along(unique_genes)) {
-  cat(paste0("Unique genes for set ", celltypes[i], ": "))
-  print(unique_genes[[i]])
-  cat("\n")
-}
-
-# Calculate unique genes counts for each set
-unique_genes_counts <- sapply(unique_genes, length)
-
-# Calculate genes present in at least 5 sets
-all_genes <- unique(unlist(gene_sets))
-gene_count <- table(unlist(gene_sets))
-genes_in_at_least_5_sets <- sum(gene_count >= 5)
-
-# Prepare data for bar graph
-categories <- c('At least 5 sets',
-                paste0('Unique to ', celltypes))
-counts <- c(genes_in_at_least_5_sets, unique_genes_counts)
-
-# Create a data frame for plotting
-data <- data.frame(Category = categories, Count = counts)
-
-# Plot bar graph using ggplot2
-ggplot(data, aes(x = Category, y = Count)) +
-  geom_bar(stat = 'identity', fill = 'skyblue') +
-  geom_text(aes(label = Count), vjust = -0.3, size = 5) +
-  labs(x = 'Category', y = 'Number of Genes', title = 'Gene Intersections and Unique Gene Counts') +
-  theme_minimal() + RotatedAxis()
-```
-
-## Comparing diapause timepoints
-
-```{r}
-
-DefaultAssay(so) <- "RNA"
-Idents(so) <- "timepoint_group"
-
-
-
-
-#early vs mid
-early_vs_mid <- FindMarkers(so, ident.1 = "middia", ident.2 = "earlydia")
-
-#early vs late
-early_vs_late <- FindMarkers(so, ident.1 = "latedia", ident.2 = "earlydia")
-
-#mid vs late
-mid_vs_late <- FindMarkers(so, ident.1 = "latedia", ident.2 = "middia")
-
-#TODO: try pseudobulk
-pseudo <- AggregateExpression(so, assays = "RNA", return.seurat = T, group.by = "timepoint_group")
-pseudo <- NormalizeData(pseudo)
-pseudo <- FindVariableFeatures(pseudo)
-I
-p <- DoHeatmap(pseudo, slot = "data", features = top_dia$gene)
-SaveFigure(p, "heatmap_diaup_pseudo", height = 10, width = 10)
-
-
-DotPlot(so, features = top_dia$gene)
-
-#make heatmap with different columns
-
-top_dia <- global_DE %>% filter(DE == "Dia Up")
-p <- DoHeatmap(so, group.by = "timepoint_group", slot = "data", disp.max = 4,  features = top_dia$gene)
-SaveFigure(p, "heatmap_diaup", height = 10, width = 10)
-
-FeaturePlot(so, c("LOC107373896", "LOC107373895"), reduction = "umap")
-
-```
-
-## Compute Global and Cell Type Dia/Dev Peaks
-
-```{r}
-compute_motif_enrichment <- function(dia, dev, master){
-  #compute DE genes
-  DefaultAssay(so) <- "ATAC"
-  df <- FindMarkers(so, ident.1 = dia, ident.2 = dev)
-  
-
-  #identify upregulated diapause peaks  
-  dia.peak <- rownames(df[df$avg_log2FC > 0.5 & df$p_val_adj < 0.05,])
-  
-  #compute motif enrichment
-  enriched.motifs <- FindMotifs(
-    object = so,
-    features = dia.peak
-  )
-  return(enriched.motifs)
-}
-
-global_motifs <- compute_motif_enrichment(all_dia, all_dev)
-blood_motifs <- compute_motif_enrichment(blood_dia, blood_dev)
-endothelial_motifs <- compute_motif_enrichment(endothelial_dia, endothelial_dev)
-mbhb_motifs <- compute_motif_enrichment(mbhb_dia, mbhb_dev)
-spinalcord_motifs <- compute_motif_enrichment(spinalcord_dia, spinalcord_dev)
-telencephalon_motifs <- compute_motif_enrichment(telencephalon_dia, telencephalon_dev)
-neuprog_motifs <- compute_motif_enrichment(neuprog_dia, neuprog_dev)
-neuron_motifs <- compute_motif_enrichment(neuron_dia, neuron_dev)
-epidermal_motifs <- compute_motif_enrichment(epidermal_dia, epidermal_dev)
-hatch_motifs <- compute_motif_enrichment(hatch_dia, hatch_dev)
-somite_motifs <- compute_motif_enrichment(somite_dia, somite_dev)
-myotome_motifs <- compute_motif_enrichment(myotome_dia, myotome_dev)
-
-
-##merge all into one dataframe
-ct_motif_enrichment <- list(global_motifs,
-                            blood_motifs,
-                            endothelial_motifs,
-                            mbhb_motifs,
-                            spinalcord_motifs,
-                            telencephalon_motifs,
-                            neuprog_motifs,
-                            neuron_motifs,
-                            epidermal_motifs,
-                            hatch_motifs,
-                            somite_motifs,
-                            myotome_motifs)
-
-names <- list('global',
-              'blood',
-              'endothelial',
-              'mbhb',
-              'spinalcord',
-              'telencephalon',
-              'neuprog',
-              'neuron',
-              'epidermal',
-              'hatch',
-              'somite',
-              'myotome')
-
-create_enrichment_matrix <- function(dataframes, names, p_max = 0.05) {
-  # Create an empty list to store the filtered dataframes
-  filtered_dataframes <- list()
-  
-  # Process each dataframe
-  for (i in seq_along(dataframes)) {
-    df_filtered <- dataframes[[i]] %>%
-      filter(p.adjust < p_max) %>%
-      select(motif.name, fold.enrichment) %>%
-      mutate(df = names[i])
-    filtered_dataframes[[i]] <- df_filtered
+{
+  if(!is.null(seed)){
+    set.seed(seed)
   }
   
-  # Combine all filtered dataframes into one
-  combined_df <- bind_rows(filtered_dataframes)
+  DefaultAssay(so) <- assay
+
+  # get list of cell types which meet min cell number
+  tp1_celltypes <- (as.data.frame(table((so@meta.data %>% filter(timepoint %in% timepoints_1))$annotation_broad)) %>%
+    filter(Freq > min_cell_number))$Var1
+  tp2_celltypes <- (as.data.frame(table((so@meta.data %>% filter(timepoint %in% timepoints_2))$annotation_broad)) %>%
+    filter(Freq > min_cell_number))$Var1
+
+  cell_types <- intersect(tp1_celltypes, tp2_celltypes)
+
+  out <- data.frame(
+    row.names = rownames(so),
+    final_symbol = translate(rownames(so))
+  )
+  # global timepoint1 vs timepoint2
+  cells.1 <- WhichCells(so, expression = timepoint %in% timepoints_1, seed = seed)
+  cells.2 <- WhichCells(so, expression = timepoint %in% timepoints_2, seed = seed)
   
-  # Spread the data into a wide format
-  heatmap_df <- combined_df %>%
-    spread(key = df, value = fold.enrichment)
-  
-  # Convert to a matrix
-  heatmap_matrix <- as.matrix(heatmap_df %>%
-    column_to_rownames("motif.name"))
-  
-  # Replace NA with 0
-  heatmap_matrix[is.na(heatmap_matrix)] <- 0
-  
-  return(heatmap_matrix)
+  if(downsample_to != F){
+      cells.1 <- sample(cells.1, downsample_to)
+      cells.2 <- sample(cells.2, downsample_to)
+  }
+  df <- FindMarkers(
+    so,
+    ident.1 = cells.1,
+    ident.2 = cells.2,
+    logfc.threshold = -Inf,
+    min.pct = -Inf
+  )
+  df <- df[,output_columns]
+  colnames(df) <- paste0(colnames(df), "_", "global")
+
+  #merge with full out matrix
+  out <- merge(out, df, by=0)
+  rownames(out) <- out[,1]
+  out <- out[,-1]
+
+
+  #DE for each cell type
+  for(i in 1:length(cell_types)){
+    cell_type <- cell_types[i]
+
+    #get barcodes for each timepoint (group)
+    cells.1 = WhichCells(
+      so,
+      expression =
+        (timepoint %in% timepoints_1) &
+        (annotation_broad == cell_type),
+      seed = seed
+    )
+    cells.2 = WhichCells(
+      so,
+      expression =
+        (timepoint %in% timepoints_2) &
+        (annotation_broad == cell_type),
+      seed = seed
+    )
+    if(downsample_to != F){
+      cells.1 <- sample(cells.1, downsample_to)
+      cells.2 <- sample(cells.2, downsample_to)
+    }
+
+    #perform DE
+    df <- FindMarkers(
+      so,
+      ident.1 = cells.1,
+      ident.2 = cells.2,
+      logfc.threshold = -Inf,
+      min.pct = -Inf
+    )
+    df <- df[,output_columns]
+    colnames(df) <- paste0(colnames(df), "_", cell_type)
+
+    #merge with full out matrix
+    out <- merge(out, df, by=0)
+    rownames(out) <- out[,1]
+    out <- out[,-1]
+  }
+  return(out)
+}
+```
+
+# Global and Cell Type DE
+
+```{r}
+#min cells = 200, dia groups: 6d and 1mo, dev groups: hb and 1d, no downsampling
+df_200cells <- GlobalCelltypeDiaDE(min_cell_number = 200)
+```
+
+## Save to File
+
+```{r}
+write.csv(df_200cells, paste0(outs_dir, "master_genes_global_and_celltype.csv"))
+```
+
+## Iterative Downsampling for DE
+
+```{r}
+
+#iterative downsampling
+#min_cells = 400, downsample to 300, iterate 100 times
+
+n_iters <- 100
+results_list <- vector('list', n_iters)
+for(i in 1:n_iters){
+  df <- GlobalCelltypeDiaDE(min_cell_number = 400, downsample_to = 300)
+  df$gene <- rownames(df)
+  results_list[[i]] <- df
+  print(paste0("iteration ", i, " complete"))
 }
 
-hm <- create_enrichment_matrix(ct_motif_enrichment, names, p_max = 0.05)
+results <- bind_rows(results_list)
+
+# Identify unique cell types by extracting column names
+cell_types <- unique(gsub("(avg_log2FC|p_val_adj)_", "", grep("(avg_log2FC|p_val_adj)", names(results), value = TRUE)))
+
+# Initialize an empty list to store summary dataframes
+summary_list <- list()
+
+# Iterate over each cell type and summarize data
+for (cell_type in cell_types) {
+  logFC_col <- paste0("avg_log2FC_", cell_type)
+  pval_col <- paste0("p_val_adj_", cell_type)
+  
+  summary_df <- results %>%
+    group_by(gene) %>%
+    summarize(
+      mean_logFC = mean(!!sym(logFC_col), na.rm = TRUE),
+      freq_significant = mean(!!sym(pval_col) < 0.05, na.rm = TRUE)
+    ) %>%
+    rename_with(~ paste0(., "_", cell_type), -gene)
+  
+  summary_list[[cell_type]] <- summary_df
+}
+
+# Combine all summaries into a single dataframe
+final_summary <- Reduce(function(x, y) full_join(x, y, by = "gene"), summary_list)
+
+# View the final summary
+print(final_summary)
+```
+
+## DE Plotting
+
+```{r}
+cols_to_check <- seq(3, ncol(final_summary), by = 2)
+final_filtered <- final_summary[apply(final_summary[, cols_to_check], 1, function(row) any(row > 0.5)), ]
 ```
 
 ```{r}
+p_freq_mat <- as.matrix(final_filtered %>% select(contains("freq_significant")))
+
+binary_p_freq_mat <- ifelse(p_freq_mat > 0.5, 1, 0)
+row_counts <- rowSums(binary_p_freq_mat == 1)
+
+
+final_filtered$rank <- row_counts
+
+global <- final_filtered %>% filter(rank > 8 & mean_logFC_global > 1)
+global_mat <- as.matrix(global %>% select(contains("mean")))
+rownames(global_mat) <- translate(global$gene)
+
 library(ComplexHeatmap)
-library(circlize) # for generating colors using colorramp2
+library(circlize)
+Heatmap(global_mat, 
+        col = colorRamp2(c(-10,0,10), c("blue","white", "red")),
+        cluster_rows = T, 
+        cluster_columns = T,
+        show_row_names = T)
+```
 
-ht <- Heatmap(hm,
+```{r}
+ct <- final_filtered %>% filter(rank < 3 & mean_logFC_global > 1)
+ct_mat <- as.matrix(ct %>% select(contains("mean")))
+rownames(ct_mat) <- translate(ct$gene)
+
+library(ComplexHeatmap)
+library(circlize)
+Heatmap(ct_mat, 
+        col = colorRamp2(c(-10,0,10), c("blue","white", "red")),
+        cluster_rows = T, 
+        cluster_columns = T,
+        show_row_names = T)
+
+
+for(i in seq(3,25, 2)){
+  genes <- (ct %>% filter(.[[i]] > 0.5))[["gene"]]
+  ct_sorted <- data.frame(ct)
+  rownames(ct_sorted) <- ct_sorted$gene
+  ct_sorted <- ct_sorted[genes,]
+  ct_mat <- as.matrix(ct_sorted %>% select(contains("mean")))
+  cell_size <- unit(0.4, "cm")
+  h <- Heatmap(ct_mat, 
+          col = colorRamp2(c(-10,0,10), c("blue","white", "red")),
+          cluster_rows = F, 
+          cluster_columns = F,
+          show_row_names = T,
+          width = cell_size * ncol(ct_mat),
+          height = cell_size * nrow(ct_mat),
+          column_labels = c("global", "myotome", "somite", "endothelial", "blood", "neuron", "spinal cord", "neuron prog", "mb/hb", "telen.", "epidermal", "hatching gland"),
+          heatmap_legend_param = list(title = "dia vs dev log2FC"))
+  plot(h)
+}
+
+
+
+```
+
+```{r}
+
+PlotCellTypeGene <- function(so, gene, cell_type, annotation_column){
+  so@meta.data[[cell_type]] <- ifelse(so@meta.data[[annotation_column]] == cell_type, cell_type, "all others")
+  p1 <- FeaturePlot(so, features = gene, reduction = "umap")
+  p2 <- VlnPlot(so, features = gene, group.by = cell_type, split.by = "devtraj", cols = c("#800080", "#6BAED6", "#FD8D3C"), pt.size = 0)
+  plot(p2)
+  p2 <- p2 + geom_jitter(mapping = aes(color = split), data = p2$data,
+    position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.9))+
+    scale_color_manual(breaks = c('pre-dia','dev', 'dia'), values = c("#800080", "#FD8D3C", "#6BAED6"))
+  plot(p1)
+  plot(p2)
+}
+
+
+
+
+PlotCellTypeGene(so, gene = "ppib", cell_type = "hatching_gland", annotation_column = "annotation_broad", pt.size = 0)
+PlotCellTypeGene(so, gene = "nucb2", cell_type = "hatching_gland", annotation_column = "annotation_broad")
+
+
+PlotCellTypeGene(so, gene = "LOC107385025", cell_type = "somite", annotation_column = "annotation_broad", pt.size = 0)
+PlotCellTypeGene(so, gene = "stk10", cell_type = "somite", annotation_column = "annotation_broad", pt.size = 0)
+PlotCellTypeGene(so, gene = "pak6", cell_type = "differentiating_neuron", annotation_column = "annotation_broad", pt.size = 0)
+
+```
+
+```{r}
+cell_type_essential <- final_filtered %>% filter(rank == 11) %>% arrange(freq_significant_hatching_gland)
+
+cell_type_essential_hg <- unlist(cell_type_essential[2:7, "gene"])
+
+
+hg <- data.frame(final_filtered)
+rownames(hg) <- hg$gene
+hg <- hg[cell_type_essential_hg,]
+hg_mat <- as.matrix(hg %>% select(contains("mean")))
+
+# Define a function to add black borders to each cell
+border_fun <- function(j, i, x, y, width, height, fill) {
+  grid.rect(x = x, y = y, width = width, height = height, 
+            gp = gpar(col = "black", fill = fill))
+}
+Heatmap(hg_mat, 
+        col = colorRamp2(c(-5,0,5), c("blue","white", "red")),
+        cluster_rows = F, 
         cluster_columns = F,
-        cluster_rows = T,
-        row_names_gp = gpar(fontsize = 5),
-        column_labels = names,
-        col = colorRamp2(c(1,2), c("white", "red"))
+        show_row_names = T,
+        cell_fun = border_fun,
+        rect_gp = gpar(type = "none"),
+        heatmap_legend_param = list(title = "log2FC"),
+        column_labels = c("global", "myotome", "somite", "endothelial", "blood", "neuron", "spinal cord", "neuron prog", "mb/hb", "telen.", "epidermal", "hatching gland"),
+        row_labels = translate(cell_type_essential_hg),
+        width = 1,
+        height = 1
         )
-ht = draw(ht)
+
+```
+
+# Global and Cell Type DA
+
+```{r}
+df_200cells_ATAC <- GlobalCelltypeDiaDE(min_cell_number = 200, assay = "ATAC")
+```
+
+## Save to file
+
+```{r}
+
+library(JASPAR2020)
+
+master_peaks <- read.csv(paste0(outs_dir, "master_peaks.csv"), row.names = 1)
+rownames(master_peaks) <- master_peaks$Row.names
+master_peaks <- master_peaks[,-1]
+
+#consolidate motifs
+motif_matrix <- master_peaks %>% select(contains("MA"))
+DefaultAssay(so) <- "ATAC"
+colnames(motif_matrix) <- ConvertMotifID(so, id = colnames(motif_matrix))
+consolidated <- apply(motif_matrix, 1, function(row) {
+  columns <- colnames(motif_matrix)[which(row)]
+  return(paste(columns, collapse = ", "))
+})
+
+#remove motif matrix from master peaks
+master_peaks <- master_peaks[, -grep("MA", names(master_peaks))]
+
+#add consolidated motifs
+master_peaks$motifs <- consolidated
+
+#remove old dia/dev
+master_peaks <- master_peaks[,-c(11:15)]
 
 
-o1 = row_order(ht)
+#merge with dia/dev cell type matrix
+master_peaks <- merge(master_peaks, df_200cells_ATAC, by = "row.names")
+```
 
-View(hm[o1,])
+```{r}
+write.csv(master_peaks, paste0(outs_dir, "master_peaks_global_and_celltype.csv"))
+```
 
-SaveFigure(ht, "cell_typte_motif_enrich", height = 40, width = 30)
+## Iterative Downsampling for DA
 
+```{r}
+#iterative downsampling
+#min_cells = 400, downsample to 300, iterate 100 times
+
+n_iters <- 100
+atac_iter <- vector('list', n_iters)
+for(i in 1:n_iters){
+  df <- GlobalCelltypeDiaDE(min_cell_number = 400, downsample_to = 300, assay = "ATAC")
+  df$gene <- rownames(df)
+  atac_iter[[i]] <- df
+  print(paste0("iteration ", i, " complete"))
+}
+```
+
+```{r}
+atac_iter <- bind_rows(atac_iter)
+
+# Identify unique cell types by extracting column names
+cell_types <- unique(gsub("(avg_log2FC|p_val_adj)_", "", grep("(avg_log2FC|p_val_adj)", names(atac_iter), value = TRUE)))
+
+# Initialize an empty list to store summary dataframes
+summary_list <- list()
+
+# Iterate over each cell type and summarize data
+for (cell_type in cell_types) {
+  logFC_col <- paste0("avg_log2FC_", cell_type)
+  pval_col <- paste0("p_val_adj_", cell_type)
+  
+  summary_df <- atac_iter %>%
+    group_by(NCBI) %>%
+    summarize(
+      mean_logFC = mean(!!sym(logFC_col), na.rm = TRUE),
+      freq_significant = mean(!!sym(pval_col) < 0.05, na.rm = TRUE)
+    ) %>%
+    rename_with(~ paste0(., "_", cell_type), -NCBI)
+  
+  summary_list[[cell_type]] <- summary_df
+  print(paste0(cell_type, " done"))
+}
+
+# Combine all summaries into a single dataframe
+final_atac_iter <- Reduce(function(x, y) full_join(x, y, by = "NCBI"), summary_list)
+
+# View the final summary
+head(final_atac_iter)
+```
+
+## DA Plotting
+
+```{r}
+DefaultAssay(so) <- "ATAC"
+
+CoveragePlot(
+  object = so,
+  region = "NC.029649.1-12877240-12878110",
+  annotation = FALSE,
+  peaks = FALSE,
+  group.by = "devtraj",
+  extend.upstream = 5000,
+  extend.downstream = 5000
+) & scale_fill_manual(values = c("#800080", "#FD8D3C", "#6BAED6"))
+
+
+CoveragePlot(
+  object = so,
+  region = "NC.029649.1-3614145-3615014",
+  annotation = T,
+  peaks = T,
+  group.by = "devtraj",
+  extend.upstream = 5000,
+  extend.downstream = 5000,
+) & scale_fill_manual(values = c("#800080", "#FD8D3C", "#6BAED6"))
+
+```
+
+# Plotting
+
+```{r}
+#read in master sheets
+master_genes <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
+
+master_peaks <- read.csv(paste0(outs_dir, "master_peaks_global_and_celltype.csv"), row.names = 1)
+```
+
+
+##Plot cell type diapause genes
+```{r}
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 1
+rank_thresh <- 3
+
+#rank each gene by number of cell types in which it is significantly DE
+master_genes$rank <- rowSums(ifelse(master_genes %>% select(contains("p_val_adj")) < p_val_adj_thresh, 1, 0) == 1)
+
+celltypes <- unique(sapply(colnames(master_genes %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
+
+ctd_genes <- vector()
+for(celltype in celltypes[2:length(celltypes)]){
+  genes <- master_genes %>% filter(
+    .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
+    .data[[paste0("p_val_adj_", celltype)]] < p_val_adj_thresh &
+    .data[[paste0("avg_log2FC_", celltype)]] > fc_thresh &
+    rank < rank_thresh
+  )
+  ctd_genes <- c(ctd_genes, rownames(genes))
+}
+
+genes <- master_genes %>% filter(
+  .data[[paste0("pct.1_", "global")]] > 0.05 &
+  .data[[paste0("p_val_adj_", "global")]] < p_val_adj_thresh &
+  .data[[paste0("avg_log2FC_", "global")]] > fc_thresh
+)
+
+ctd_genes <- unique(ctd_genes)
+```
+
+
+```{r}
+# Reshape the data into long format for both avg_log2FC and p_val_adj
+long_ctd <- master_genes[ctd_genes,]
+long_ctd$gene <- rownames(long_ctd)
+
+long_ctd <- long_ctd %>%
+  pivot_longer(cols = starts_with("avg_log2FC"), 
+               names_to = "avg_log2FC_celltype", 
+               values_to = "avg_log2FC") %>%
+  pivot_longer(cols = starts_with("p_val_adj"), 
+               names_to = "p_val_adj_celltype", 
+               values_to = "p_val_adj") %>%
+  mutate(celltype = gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype)) %>%
+  filter(gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype) == gsub("avg_log2FC_|p_val_adj_", "", p_val_adj_celltype)) %>%
+  select(-avg_log2FC_celltype, -p_val_adj_celltype) # Clean up the column names
+
+long_ctd$celltype <- factor(long_ctd$celltype, unique(long_ctd$celltype))
+long_ctd$gene <- factor(long_ctd$gene, unique(long_ctd$gene))
+```
+
+```{r}
+p <- ggplot(long_ctd, aes(x = celltype, y = gene)) +
+  geom_point(aes(size = 1-p_val_adj, color = avg_log2FC), 
+             shape = 16) +  # Use a filled circle for the dots
+  scale_color_gradientn(
+    colors = c("blue", "blue", "white", "red", "red"),
+    breaks = c(-7,-2,0,2,7),
+    values = c(0,0.4,0.5,0.6,1),
+    limits = c(-7,7),
+    name = "dia vs dev log2FC"
+  ) +
+  scale_radius(
+    range = c(1,5),
+    labels = c("1", "0.75", "0.5", "0.25", "0"),
+    name = "adjusted p-val") +  # Size scale for the logFC, adjust range as necessary
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for clarity
+  labs(title = "Cell-Type Diapause Genes",
+       x = "Cell Types",
+       y = "Genes") +
+  theme(panel.grid = element_blank()) 
+
+SaveFigure(p, "ctd_genes_dotplot", type = "pdf", width = 10, height = length(ctd_genes)/6)
+
+```
+## Plot cell type diapause peaks
+
+```{r}
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 1
+rank_thresh <- 3
+
+#rank each peak by number of cell types in which it is significantly DA
+master_peaks$rank <- rowSums(ifelse(master_peaks %>% select(contains("p_val_adj")) < p_val_adj_thresh, 1, 0) == 1)
+
+celltypes <- unique(sapply(colnames(master_peaks %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
+
+ctd_peaks <- vector()
+for(celltype in celltypes[2:length(celltypes)]){
+  peaks <- master_peaks %>% filter(
+    .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
+    .data[[paste0("p_val_adj_", celltype)]] < p_val_adj_thresh &
+    .data[[paste0("avg_log2FC_", celltype)]] > fc_thresh &
+    rank < rank_thresh
+  )
+  ctd_peaks <- c(ctd_peaks, peaks$final_symbol)
+}
+
+
+ctd_peaks <- unique(ctd_peaks)
+```
+
+
+```{r}
+# Reshape the data into long format for both avg_log2FC and p_val_adj
+long_ctd_peaks <- master_peaks[master_peaks$final_symbol %in% ctd_peaks,]
+# long_ctd_peaks$gene <- rownames(long_ctd_peaks)
+
+long_ctd_peaks <- long_ctd_peaks %>%
+  pivot_longer(cols = starts_with("avg_log2FC"), 
+               names_to = "avg_log2FC_celltype", 
+               values_to = "avg_log2FC") %>%
+  pivot_longer(cols = starts_with("p_val_adj"), 
+               names_to = "p_val_adj_celltype", 
+               values_to = "p_val_adj") %>%
+  mutate(celltype = gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype)) %>%
+  filter(gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype) == gsub("avg_log2FC_|p_val_adj_", "", p_val_adj_celltype)) %>%
+  select(-avg_log2FC_celltype, -p_val_adj_celltype) # Clean up the column names
+
+
+long_ctd_peaks$celltype <- factor(long_ctd_peaks$celltype, unique(long_ctd_peaks$celltype))
+long_ctd_peaks$final_symbol <- factor(long_ctd_peaks$final_symbol, ctd_peaks)
+```
+
+```{r}
+p <- ggplot(long_ctd_peaks, aes(x = celltype, y = final_symbol)) +
+  geom_point(aes(size = 1-p_val_adj, color = avg_log2FC), 
+             shape = 16) +  # Use a filled circle for the dots
+  scale_color_gradientn(
+    colors = c("blue", "blue", "white", "red", "red"),
+    breaks = c(-7,-2,0,2,7),
+    values = c(0,0.4,0.5,0.6,1),
+    limits = c(-7,7),
+    name = "dia vs dev log2FC"
+  ) +
+  scale_radius(
+    range = c(1,5),
+    labels = c("1", "0.75", "0.5", "0.25", "0"),
+    name = "adjusted p-val") +  # Size scale for the logFC, adjust range as necessary
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for clarity
+  labs(title = "Cell-Type Diapause Peaks",
+       x = "Cell Types",
+       y = "Genes") +
+  theme(panel.grid = element_blank()) 
+
+
+SaveFigure(p, "ctd_peaks_dotplot", type = "pdf", width = 10, height = length(ctd_peaks)/6)
+```
+## Specific Examples
+```{r}
+DefaultAssay(so) <- "RNA"
+FeaturePlot(so, "pclo", reduction = "umap")
+VlnPlot(so, "pclo", group.by = "annotation_broad", split.by = "devtraj" )
+
+VlnPlot(so, "LOC107380958", group.by = "annotation_broad", split.by = "devtraj" )
+FeaturePlot(so, "LOC107380958", reduction = "umap")
+
+```
+
+```{r}
+
+```
+
+
+# Cell Type Level GSEA
+
+```{r}
+#read in master sheets
+master_genes <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
+
+master_peaks <- read.csv(paste0(outs_dir, "master_peaks_global_and_celltype.csv"), row.names = 1)
+```
+
+```{r}
+library(msigdbr)
+library(fgsea)
+```
+
+```{r}
+msigdbr_species()
+
+m_df<- msigdbr(species = "Danio rerio", category = "C5")
 ```

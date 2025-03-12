@@ -21,48 +21,37 @@ fig_dir <- "../results_all/"
 ```
 #Load Seurat Object
 ```{r}
-so <- readRDS("../results_all/so_neurons.rds")
+# so <- readRDS("../results_all/so_neurons.rds")
 ```
 
 
 ```{r}
-so$barcode <- colnames(so)
-so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
-so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
-so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
-so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
-so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
-so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
-
-# write metadata
-write.csv(so@meta.data, file=paste0(outs_dir, 'metadata.csv'), quote=F, row.names=F)
-
-# write dimesnionality reduction matrix, in this example case pca matrix
-write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, 'pca.csv'), quote=F, row.names=F)
-
-# extract neighborhood graph
-nn_idx <- so@neighbors$weighted.nn@nn.idx
-nn_dist <- so@neighbors$weighted.nn@nn.dist
-nn_cells <- so@neighbors$weighted.nn@cell.names
-
-# save neighborhood graph
-write.table(nn_idx, paste0(outs_dir, "nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-write.table(nn_dist, paste0(outs_dir, "nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-write.table(nn_cells, paste0(outs_dir, "nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-
-rm(so)
-gc()
-
-# # write expression counts matrix
-# library(Matrix)
-# counts_matrix <- GetAssayData(seurat_obj, assay='RNA', slot='counts')
-# writeMM(counts_matrix, file=paste0(out_data_dir, 'counts.mtx'))
-#
-# # write gene names
-# write.table(
-#   data.frame('gene'=rownames(counts_matrix)),file='gene_names.csv',
-#   quote=F,row.names=F,col.names=F
-# )
+# so$barcode <- colnames(so)
+# so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
+# so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
+# so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
+# so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
+# so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
+# so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
+# 
+# # write metadata
+# write.csv(so@meta.data, file=paste0(outs_dir, 'metadata.csv'), quote=F, row.names=F)
+# 
+# # write dimesnionality reduction matrix, in this example case pca matrix
+# write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, 'pca.csv'), quote=F, row.names=F)
+# 
+# # extract neighborhood graph
+# nn_idx <- so@neighbors$weighted.nn@nn.idx
+# nn_dist <- so@neighbors$weighted.nn@nn.dist
+# nn_cells <- so@neighbors$weighted.nn@cell.names
+# 
+# # save neighborhood graph
+# write.table(nn_idx, paste0(outs_dir, "nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+# write.table(nn_dist, paste0(outs_dir, "nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+# write.table(nn_cells, paste0(outs_dir, "nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+# 
+# rm(so)
+# gc()
 ```
 
 
@@ -188,27 +177,105 @@ adata_atac = adata_atac[shared_cells, shared_genes]
 ```
 
 ```{python}
+#pre-process
 scv.pp.normalize_per_cell(adata_rna)
 scv.pp.log1p(adata_rna)
 scv.pp.moments(adata_rna, n_pcs=30, n_neighbors=50)
 ```
 ```{python}
-sc.pl.umap(adata_rna, color=['annotation_broad'], frameon=False, legend_loc='on data')
+sc.pl.umap(adata_rna, color=['annotation_broad'], frameon=False, legend_loc='on data', palette = ['',])
+sc.pl.umap(adata_rna, color=['timepoint_group'], frameon=False, legend_loc='on data', palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
+
 ```
 
+# ScVelo
 
+## Splicing proportions
 ```{python}
 scv.pl.proportions(adata_rna, groupby='annotation_broad')
+scv.pl.proportions(adata_rna, groupby='timepoint_group')
+
 ```
+## Compute Velocities
 ```{python}
+#compute velocity for each gene
 scv.tl.velocity(adata_rna, mode='stochastic')
+
+#compute transition probabilities using gene velocities
 scv.tl.velocity_graph(adata_rna)
 ```
+
+## Visualize velocity fields
 ```{python}
+#visualize velocity fields
 scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='annotation_broad', save='embedding_grid.pdf', title='', scale=0.25)
 scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color='annotation_broad', save='embedding_stream.pdf', title='')
 ```
-# Smoothing gene aggregagted peaks by neighbors
+
+## Plot some genes
+```{python}
+# plot velocity of a selected gene
+scv.pl.velocity(adata_rna, var_names=['jade2'], color='timepoint_group')
+scv.pl.velocity(adata_rna, var_names=['elavl3'], color='annotation_broad')
+
+```
+
+## Identify Important genes
+```{python}
+scv.tl.rank_velocity_genes(adata_rna, groupby='timepoint_group', min_corr=.3)
+
+df = pd.DataFrame(adata_rna.uns['rank_velocity_genes']['names'])
+df.head()
+```
+```{python}
+kwargs = dict(frameon=False, size=10, linewidth=1.5, color = 'timepoint_group')
+
+scv.pl.scatter(adata_rna, df['latedia'][:5], ylabel='latedia', **kwargs)
+scv.pl.scatter(adata_rna, df['dev'][:5], ylabel='dev', **kwargs)
+```
+
+## Speed and coherence
+Two more useful stats: - The speed or rate of differentiation is given by the length of the velocity vector. - The coherence of the vector field (i.e., how a velocity vector correlates with its neighboring velocities) provides a measure of confidence.
+```{python}
+scv.tl.velocity_confidence(adata_rna)
+keys = 'velocity_length', 'velocity_confidence'
+scv.pl.scatter(adata_rna, c=keys, cmap='coolwarm', perc=[5, 95])
+```
+
+## Velocity graph and pseudotime
+```{python}
+scv.pl.velocity_graph(adata_rna, threshold=.5, color = 'timepoint_group')
+```
+
+```{python}
+scv.tl.velocity_pseudotime(adata_rna)
+scv.pl.scatter(adata_rna, color='velocity_pseudotime', cmap='gnuplot')
+```
+## PAGA velocity graph
+```{python}
+!pip install python-igraph --upgrade --quiet
+```
+
+
+```{python}
+# this is needed due to a current bug - bugfix is coming soon.
+adata_rna.uns['neighbors']['distances'] = adata_rna.obsp['distances']
+adata_rna.uns['neighbors']['connectivities'] = adata_rna.obsp['connectivities']
+
+scv.tl.paga(adata_rna, groups='timepoint_group')
+df = scv.get_df(adata_rna, 'paga/transitions_confidence', precision=2).T
+df.style.background_gradient(cmap='Blues').format('{:.2g}')
+
+df
+```
+
+```{python}
+scv.pl.paga(adata_rna, basis='umap', size=50, alpha=.1, min_edge_width=2, node_size_scale=1.5)
+```
+
+
+# Multi-Velo
+## Smoothing gene aggregagted peaks by neighbors
 ```{python}
 nn_idx = np.loadtxt("../results_all/nn_idx.txt", delimiter=',')
 nn_dist = np.loadtxt("../results_all/nn_dist.txt", delimiter=',')
@@ -216,17 +283,18 @@ nn_cells = pd.Index(pd.read_csv("../results_all/nn_cells.txt", header=None)[0])
 
 np.all(nn_cells == adata_atac.obs_names)
 ```
+
 ```{python}
 mv.knn_smooth_chrom(adata_atac, nn_idx, nn_dist)
 ```
 
-# Running multi-omic dynamical model
+## Running multi-omic dynamical model (done on wynton)
 ```{python}
 adata_result = mv.recover_dynamics_chrom(adata_rna,
                                          adata_atac,
                                          max_iter=5,
                                          init_mode="invert",
-                                         parallel=True,
+                                         parallel=False,
                                          save_plot=False,
                                          rna_only=False,
                                          fit=True,
