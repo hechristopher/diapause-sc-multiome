@@ -204,7 +204,7 @@ so_neurons <- RunUMAP(so_neurons, nn.name = "weighted.nn", reduction.name = "wnn
 
 ```{r}
 
-_DimPlot(so_neurons, reduction = "wnn.umap", group.by = "annotation_ATAC_broad", cols = colors_broad, label = T)
+DimPlot(so_neurons, reduction = "wnn.umap", group.by = "annotation_ATAC_broad", cols = colors_broad, label = T)
 
 ```
 
