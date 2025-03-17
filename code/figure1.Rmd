@@ -27,17 +27,17 @@ so <- readRDS("../results_all/so_dual_annotated.rds")
 timepoint_cols <- c("#E496EF","#800080", "#C6DBEF", "#C6DBEF", "#6BAED6", "#2171B5", "#08306B", "#FD8D3C")
 
 #RNA UMAPs
-p1 <- DimPlot(so, group.by = "annotation_broad", reduction = "umap", label = F, cols = colors_broad) + NoLegend() + NoAxes()
+p1 <- DimPlot(so, group.by = "annotation_broad", reduction = "umap", label = F, cols = colors_broad, pt.size = 0.5) + NoLegend() + NoAxes()
 SaveFigure(p1, "1B_umap_annot_rna", type = "png", width = 10, height = 10, res = 300)
 
-p2 <- DimPlot(so, group.by = "timepoint", reduction = "umap", label = F, cols = timepoint_cols) + NoLegend() + NoAxes()
+p2 <- DimPlot(so, group.by = "timepoint", reduction = "umap", label = F, cols = timepoint_cols, pt.size = 0.5) + NoLegend() + NoAxes()
 SaveFigure(p2, "1B_umap_timepoint_rna", type = "png", width = 10, height = 10, res = 300)
 
 #ATAC UMAPs
-p3 <- DimPlot(so, group.by = "annotation_ATAC_broad", reduction = "umap_ATAC", label = F, cols = colors_broad) + NoLegend() + NoAxes()
+p3 <- DimPlot(so, group.by = "annotation_ATAC_broad", reduction = "umap_ATAC", label = F, cols = colors_broad, pt.size = 0.5) + NoLegend() + NoAxes()
 SaveFigure(p3, "1B_umap_annot_atac", type = "png", width = 10, height = 10, res = 300)
 
-p4 <- DimPlot(so, group.by = "timepoint", reduction = "umap_ATAC", label = F, cols = timepoint_cols) + NoLegend() + NoAxes()
+p4 <- DimPlot(so, group.by = "timepoint", reduction = "umap_ATAC", label = F, cols = timepoint_cols, pt.size = 0.5) + NoLegend() + NoAxes()
 SaveFigure(p4, "1B_umap_timepoint_atac", type = "png", width = 10, height = 10, res = 300)
 ```
 # Figure 1C
