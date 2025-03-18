@@ -8,6 +8,8 @@ suppressPackageStartupMessages({
   library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
   library(tidyverse)
   library(glmnet)
+  library(ComplexHeatmap)
+  library(dtwclust)
 })
 
 #import helper functions
@@ -19,7 +21,7 @@ fig_dir <- "../results_all/diapause_model/"
 ```
 
 ```{r}
-so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+so <- readRDS("../results_all/so_wnn.rds")
 DefaultAssay(so) <- "RNA"
 ```
 
@@ -163,7 +165,7 @@ mean((test_barcodes$timepoint_encoded2 - test_barcodes$prediction_encoded2)^2)
 ```{r}
 #predict whole dataset
 prediction_encoded2_full <- predict(m, newx = sparse_mat_filter, s = "lambda.min")
-subsampled_barcodes$prediction_encoded2 <- prediction_encoded2_full
+subsampled_barcodes$prediction_encoded2 <- prediction_encoded2_full[,1]
 
 mse <- mean((subsampled_barcodes$timepoint_encoded2 - subsampled_barcodes$prediction_encoded2)^2)
 
@@ -241,6 +243,67 @@ mse_df$mse <- mse_sweep
 
 ggplot(mse_df, aes(x = genes, y = mse)) + geom_point()
 ```
+
+## Time Warp Clustering
+1. subset cells to cells included in model
+2. scale gene expression and subset to 5000 most highly variable genes
+3. construct 100 bins of equal numbers of cells across inferred time, compute average expression of each gene for each bin
+4. smooth expression values
+5. Subset top 2000 highly variable genes
+6. scale and center to mean=0, sd=1
+7. dynamic time warp clustering with tsclust function from dtwclust v5.5.10
+  type='partitional', distance='dtw_basic', and centroid='pam'
+  try different number of clusters (k)
+```{r}
+#order cells by predicted time
+subsampled_barcodes <- subsampled_barcodes %>% arrange(prediction_encoded2) %>%
+  mutate(time_bin = ntile(subsampled_barcodes$prediction_encoded2, 100))
+
+
+#top 5000 variable genes (matrix is barcodes x genes)
+top_var_mat <- sparse_mat_filter[rownames(subsampled_barcodes) ,variable_features[1:5000]]
+
+#average for 100 bins
+average_expression <- top_var_mat %>%
+  as.data.frame() %>%
+  mutate(bin = subsampled_barcodes$time_bin) %>%
+  group_by(bin) %>%
+  summarise(across(everything(), mean))
+
+#smooth expression values
+#moving average
+smoothed_data <- zoo::rollapply(average_expression, width = 3, FUN = mean, by.column = TRUE, fill = NA)
+
+#scale data
+scaled_data <- scale(smoothed_data[c(-1,-100), -1], center = TRUE, scale = TRUE)
+
+#clustering 
+# k_clusters <- 4
+# clusts0 <- tsclust(t(scaled_data), type='partitional',
+# 	k=4, # to check different values
+# 	distance='dtw_basic', centroid='pam', trace=T)
+
+
+avg_prediction <- (subsampled_barcodes %>% group_by(time_bin) %>% mutate(avg_predict = mean(prediction_encoded2)) %>% ungroup())$avg_predict
+
+predicted_annot = HeatmapAnnotation(model_time = round(unique(avg_prediction)[2:99]), show_legend = T, show_annotation_name = T, simple_anno_size = unit(0.3, "cm"), col = list(model_time = colorRamp2(c(0,5), c("gold", "forestgreen"))))
+
+hm <- Heatmap(t(scaled_data), cluster_columns = F, row_km = 5, row_km_repeats = 100,
+        show_row_dend = FALSE, show_row_names = F, show_column_names = F,
+        top_annotation = predicted_annot)
+
+hm = draw(hm)
+
+
+row_order <- row_order(hm)
+
+module_3_genes <- colnames(scaled_data)[row_order$`3`]
+translate(head(module_3_genes))
+
+
+intersect(module_3_genes, master_genes %>% filter(p_val_adj_global < 0.05 & avg_log2FC_global > 1))
+```
+
 
 # Compute WGCNA for single cell
 ```{r}
