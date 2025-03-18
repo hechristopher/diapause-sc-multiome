@@ -16,45 +16,72 @@ suppressPackageStartupMessages({
 source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
 #set output and figure directories
-outs_dir <- "../results_all/"
-fig_dir <- "../results_all/"
+outs_dir <- "../results_all/lineage_subsets/"
+fig_dir <- "../results_all/figures/"
 ```
-#Load Seurat Object
+
+
+# Write files for conversion to adata
+- lineages: neuron, epidermal, somite, hatching gland, endothelial, blood
 ```{r}
-# so <- readRDS("../results_all/so_neurons.rds")
+so_neuron <- readRDS("../results_all/lineage_subsets/so_neurons.rds")
+so_epidermal <- readRDS("../results_all/lineage_subsets/so_epidermal.rds")
+so_somite <- readRDS("../results_all/lineage_subsets/so_somite.rds")
+so_hatch <- readRDS("../results_all/lineage_subsets/so_hatch.rds")
+so_endothelial <- readRDS("../results_all/lineage_subsets/so_endothelial.rds")
+so_blood <- readRDS("../results_all/lineage_subsets/so_blood.rds")
+
+so_list <- c(so_neuron, so_epidermal, so_somite, so_hatch, so_endothelial, so_blood)
+
+for(i in 1:6){
+  so <- so_list[[i]]
+  p1 <- DimPlot(so, reduction = "umap.rna", group.by = "timepoint_group", cols = colors_timepoints)
+  p2 <- DimPlot(so, reduction = "umap.rna", group.by = "annotation_broad", cols = colors_broad, label = T)
+  p3 <- DimPlot(so, reduction = "umap.rna", group.by = "RNA_snn_res.0.8", label = T)
+
+  
+  p4 <- DimPlot(so, reduction = "umap.atac", group.by = "timepoint_group", cols = colors_timepoints)
+  p5 <- DimPlot(so, reduction = "umap.atac", group.by = "annotation_broad", cols = colors_broad, label = T)
+  p6 <- DimPlot(so, reduction = "umap.atac", group.by = "ATAC_snn_res.0.8", label = T)
+
+  p7 <- DimPlot(so, reduction = "wnn.umap", group.by = "timepoint_group", cols = colors_timepoints)
+  p8 <- DimPlot(so, reduction = "wnn.umap", group.by = "annotation_broad", cols = colors_broad, label = T)
+  
+  SaveFigure((p1|p2|p3)/(p4|p5|p6)/(p7|p8) & NoLegend() & NoAxes(), paste0(i, "_subset_umaps"), width = 10, height = 10)
+}
 ```
 
 
 ```{r}
-# so$barcode <- colnames(so)
-# so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
-# so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
-# so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
-# so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
-# so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
-# so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
-# 
-# # write metadata
-# write.csv(so@meta.data, file=paste0(outs_dir, 'metadata.csv'), quote=F, row.names=F)
-# 
-# # write dimesnionality reduction matrix, in this example case pca matrix
-# write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, 'pca.csv'), quote=F, row.names=F)
-# 
-# # extract neighborhood graph
-# nn_idx <- so@neighbors$weighted.nn@nn.idx
-# nn_dist <- so@neighbors$weighted.nn@nn.dist
-# nn_cells <- so@neighbors$weighted.nn@cell.names
-# 
-# # save neighborhood graph
-# write.table(nn_idx, paste0(outs_dir, "nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-# write.table(nn_dist, paste0(outs_dir, "nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-# write.table(nn_cells, paste0(outs_dir, "nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
-# 
-# rm(so)
-# gc()
+for(i in 1:6){
+  so <- so_list[[i]]
+  so$barcode <- colnames(so)
+  so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
+  so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
+  so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
+  so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
+  so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
+  so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
+  
+  # write metadata
+  write.csv(so@meta.data, file=paste0(outs_dir, i, '_metadata.csv'), quote=F, row.names=F)
+  
+  # write dimesnionality reduction matrix, in this example case pca matrix
+  write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, i, '_pca.csv'), quote=F, row.names=F)
+  
+  # extract neighborhood graph
+  nn_idx <- so@neighbors$weighted.nn@nn.idx
+  nn_dist <- so@neighbors$weighted.nn@nn.dist
+  nn_cells <- so@neighbors$weighted.nn@cell.names
+  
+  # save neighborhood graph
+  write.table(nn_idx, paste0(outs_dir, i, "_nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+  write.table(nn_dist, paste0(outs_dir, i, "_nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+  write.table(nn_cells, paste0(outs_dir, i, "_nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+}
 ```
 
-
+# Activate Python environnment
 Note: Using python version through reticulate. scVelo and multiVelo were installed in the multiome-velocyto conda environment
 ```{r}
 reticulate::use_condaenv("multiome-velocyto")
@@ -62,8 +89,8 @@ library(reticulate)
 ```
 
 ```{python}
-import os
 import scipy
+import os
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -75,6 +102,8 @@ from pathlib import Path
 
 ```{python}
 sc.settings.cachedir = Path('../results_all/cache')
+scv.settings.figdir = '../results_all/lineage_subsets'
+scv.settings.plot_prefix = ""
 scv.settings.verbosity = 3
 scv.settings.presenter_view = True
 scv.set_figure_params('scvelo')
@@ -83,6 +112,7 @@ pd.set_option('display.max_rows', 200)
 np.set_printoptions(suppress=True)
 ```
 
+# Process adata object (wynton)
 ## Reading in unspliced and spliced counts
 ```{python}
 adata_rna = sc.read("../aggr_batch1-3/velocyto/velocyto_combined.loom", cache=True)
@@ -134,20 +164,17 @@ scv.pp.filter_and_normalize(adata_rna, min_shared_counts=10, n_top_genes=2000)
 
 ##Preprocessing the ATAC counts (Done on wynton)
 ```{python}
-# adata_atac = sc.read_10x_mtx('../aggr_batch1-3/filtered_feature_bc_matrix/', var_names='gene_symbols', cache=True, gex_only=False)
-# adata_atac = adata_atac[:,adata_atac.var['feature_types'] == "Peaks"]
+adata_atac = sc.read_10x_mtx('../aggr_batch1-3/filtered_feature_bc_matrix/', var_names='gene_symbols', cache=True, gex_only=False)
+adata_atac = adata_atac[:,adata_atac.var['feature_types'] == "Peaks"]
 ```
 
 ```{python}
-# adata_atac = mv.aggregate_peaks_10x(adata_atac,
-#                                     '../aggr_batch1-3/atac_peak_annotation.tsv',
-#                                     '../aggr_batch1-3/feature_linkage.bedpe')
-#                                     
+adata_atac = mv.aggregate_peaks_10x(adata_atac,
+                                    '../aggr_batch1-3/atac_peak_annotation.tsv',
+                                    '../aggr_batch1-3/feature_linkage.bedpe')
+
 ```
-## Read in results from wynton
-```{python}
-adata_atac = sc.read_h5ad('../results_all/adata_atac.h5ad')
-```
+
 
 ```{python}
 plt.hist(adata_atac.X.sum(1), bins=100, range=(0, 100000))
@@ -160,12 +187,12 @@ plt.show()
 adata_atac = adata_atac[adata_atac.obs_names.isin(barcodes)].copy()
 adata_atac.obs_names
 ```
-# We normalize aggregated peaks with TF-IDF.
+## We normalize aggregated peaks with TF-IDF.
 ```{python}
 mv.tfidf_norm(adata_atac)
 ```
 
-#Finding shared barcodes and features between RNA and ATAC
+## Finding shared barcodes and features between RNA and ATAC
 ```{python}
 shared_genes = pd.Index(np.intersect1d(adata_rna.var_names, adata_atac.var_names))
 shared_cells = pd.Index(np.intersect1d(adata_rna.obs_names, adata_atac.obs_names))
@@ -182,13 +209,53 @@ scv.pp.normalize_per_cell(adata_rna)
 scv.pp.log1p(adata_rna)
 scv.pp.moments(adata_rna, n_pcs=30, n_neighbors=50)
 ```
+
 ```{python}
 sc.pl.umap(adata_rna, color=['annotation_broad'], frameon=False, legend_loc='on data', palette = ['',])
 sc.pl.umap(adata_rna, color=['timepoint_group'], frameon=False, legend_loc='on data', palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
 
 ```
 
+# Read in results from wynton
+```{python}
+# adata_result = sc.read_h5ad("../results_all/lineage_subsets/1_multivelo_result.h5ad")
+adata_rna = sc.read_h5ad("../results_all/velocity/adata_rna.h5ad")
+adata_atac = sc.read_h5ad("../results_all/velocity/adata_atac.h5ad")
+```
+
 # ScVelo
+```{python}
+#iterate through all lineages, compute velocity, pseudotime, etc. and plot, save adata object
+
+for j in range(1,7):
+  i = str(j)
+  adata_rna = sc.read_h5ad("../results_all/lineage_subsets/" + i + "_adata_rna.h5ad")
+  
+  #velocity
+  scv.tl.velocity(adata_rna, mode='stochastic')
+  scv.tl.velocity_graph(adata_rna)
+  
+  #graph velocity
+  scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='timepoint_group', save= i + '_embedding_grid.png', title='', scale=0.25, palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
+  scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color='timepoint_group', save= i + '_embedding_stream.png', title='', palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
+  
+  #top velocity genes
+  scv.tl.rank_velocity_genes(adata_rna, groupby='timepoint_group', min_corr=.3)
+  df = pd.DataFrame(adata_rna.uns['rank_velocity_genes']['names'])
+  df.to_csv("../results_all/lineage_subsets/" + i + "_velocity_genes.csv")
+  
+  #velocity graph and pseudotime
+  scv.pl.velocity_graph(adata_rna, threshold=.5, color = 'timepoint_group', save= i + '_velocity_graph.png')
+  scv.tl.velocity_pseudotime(adata_rna)
+  scv.pl.scatter(adata_rna, color='velocity_pseudotime', cmap='gnuplot', save = i + '_velocity_pseudotime.png')
+  
+  hm = scv.pl.heatmap(adata_rna, var_names=adata_rna.var.index, sortby='velocity_pseudotime', col_color='timepoint_group', n_convolve=100, save = i + '_pseudotime_heatmap.png', show = False, figsize = (8,10))
+  gene_order = hm.data2d.index.tolist()
+  pd.DataFrame(gene_order).to_csv("../results_all/lineage_subsets/" + i + "_heatmap_gene_order.csv", sep = "\n", index = False)
+  
+  adata_rna.write("../results_all/lineage_subsets/" + i + "_adata_rna.h5ad", compression='gzip')
+
+```
 
 ## Splicing proportions
 ```{python}
@@ -210,6 +277,10 @@ scv.tl.velocity_graph(adata_rna)
 #visualize velocity fields
 scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='annotation_broad', save='embedding_grid.pdf', title='', scale=0.25)
 scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color='annotation_broad', save='embedding_stream.pdf', title='')
+
+
+scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='timepoint_group', save='embedding_grid.pdf', title='', scale=0.25, palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
+scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color='timepoint_group', save='embedding_stream.pdf', title='', palette = ['#FD8D3C','#C6DBEF', '#2171B5', '#6BAED6', '#800080'])
 ```
 
 ## Plot some genes
@@ -227,11 +298,13 @@ scv.tl.rank_velocity_genes(adata_rna, groupby='timepoint_group', min_corr=.3)
 df = pd.DataFrame(adata_rna.uns['rank_velocity_genes']['names'])
 df.head()
 ```
+
+
 ```{python}
 kwargs = dict(frameon=False, size=10, linewidth=1.5, color = 'timepoint_group')
 
-scv.pl.scatter(adata_rna, df['latedia'][:5], ylabel='latedia', **kwargs)
-scv.pl.scatter(adata_rna, df['dev'][:5], ylabel='dev', **kwargs)
+scv.pl.scatter(adata_rna, df['latedia'][:5], ylabel='latedia', dpi = 500, save='latedia_neuron_genes.pdf', **kwargs)
+scv.pl.scatter(adata_rna, df['earlydia'][:5], ylabel='earlydia', save='earlydia_neuron_genes.png', **kwargs)
 ```
 
 ## Speed and coherence
@@ -250,6 +323,9 @@ scv.pl.velocity_graph(adata_rna, threshold=.5, color = 'timepoint_group')
 ```{python}
 scv.tl.velocity_pseudotime(adata_rna)
 scv.pl.scatter(adata_rna, color='velocity_pseudotime', cmap='gnuplot')
+
+scv.pl.heatmap(adata_rna, var_names=adata_rna.var.index, sortby='velocity_pseudotime', col_color='timepoint_group', n_convolve=100, save = 'pseudotime_heatmap_neuron.png')
+
 ```
 ## PAGA velocity graph
 ```{python}
@@ -275,7 +351,7 @@ scv.pl.paga(adata_rna, basis='umap', size=50, alpha=.1, min_edge_width=2, node_s
 
 
 # Multi-Velo
-## Smoothing gene aggregagted peaks by neighbors
+## Smoothing gene aggregagted peaks by neighbors
 ```{python}
 nn_idx = np.loadtxt("../results_all/nn_idx.txt", delimiter=',')
 nn_dist = np.loadtxt("../results_all/nn_dist.txt", delimiter=',')
@@ -303,11 +379,75 @@ adata_result = mv.recover_dynamics_chrom(adata_rna,
                                         )
 ```
 
+```{python}
+#Read in results from wynton
 
-```{r}
-library(reticulate)
-table(py$suff)
+adata_result = sc.read_h5ad("../results_all/velocity/multivelo_result.h5ad")
+adata_rna = sc.read_h5ad("../results_all/velocity/adata_rna.h5ad")
+adata_atac = sc.read_h5ad("../results_all/velocity/adata_atac.h5ad")
+```
+
+
+## Multi-velo plots
+```{python}
+mv.pie_summary(adata_result)
+plt.show()
+
+mv.switch_time_summary(adata_result)
+plt.show()
+
+mv.likelihood_plot(adata_result)
+plt.show()
 
 ```
 
+```{python}
+mv.velocity_graph(adata_result)
+mv.latent_time(adata_result)
+```
+```{python}
+mv.velocity_embedding_stream(adata_result, basis='umap', color = 'annotation_broad')
+
+
+```
+
+# scVelo Dynamical model
+
+```{python}
+scv.pp.filter_and_normalize(adata_rna, min_shared_counts=10, n_top_genes=2000)
+scv.pp.moments(adata_rna, n_pcs=30, n_neighbors=30)
+```
+
+```{python}
+scv.tl.recover_dynamics(adata_rna)
+```
+
+```{python}
+scv.tl.velocity(adata_rna, mode='dynamical')
+scv.tl.velocity_graph(adata_rna)
+
+adata_rna.write('../results_all/velocity/adata_rna_dynamical.h5ad', compression='gzip')
+adata_rna = sc.read('../results_all/velocity/adata_rna_dynamical.h5ad')
+```
+```{python}
+scv.pl.velocity_embedding_grid(adata_rna, basis='umap', color='annotation_broad', save='embedding_grid.pdf', title='', scale=0.25)
+
+scv.pl.velocity_embedding_stream(adata_rna, basis='umap', color = "timepoint_group")
+```
+
+
+```{python}
+scv.tl.latent_time(adata_rna)
+scv.pl.scatter(adata_rna, color='latent_time', color_map='gnuplot', size=80)
+scv.pl.scatter(adata_rna, color='velocity_pseudotime', color_map='gnuplot', size=80)
+
+```
+
+```{python}
+top_genes = adata_rna.var['fit_likelihood'].sort_values(ascending=False).index[:300]
+scv.pl.heatmap(adata_rna, var_names=top_genes, sortby='velocity_pseudotime', col_color='annotation_broad', n_convolve=100)
+```
+```{python}
+adata_rna.obs
+```
 
