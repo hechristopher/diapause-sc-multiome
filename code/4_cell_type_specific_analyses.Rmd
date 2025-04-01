@@ -41,7 +41,7 @@ so <- readRDS(paste0(outs_dir, "so_wnn.rds"))
 -   downsample_to: number of cells to downsample to
 -   assay: either "RNA" or "ATAC"
 
-```{r}
+```{r include = FALSE}
 #function for cell global and cell type DE (dia vs dev)
 GlobalCelltypeDiaDE <- function(
     min_cell_number,
@@ -71,7 +71,7 @@ GlobalCelltypeDiaDE <- function(
     row.names = rownames(so),
     final_symbol = translate(rownames(so))
   )
-  # global timepoint1 vs timepoint2
+  # global timepoint1 vs timepoint2 comparison
   cells.1 <- WhichCells(so, expression = timepoint %in% timepoints_1, seed = seed)
   cells.2 <- WhichCells(so, expression = timepoint %in% timepoints_2, seed = seed)
   
@@ -199,38 +199,6 @@ final_summary <- Reduce(function(x, y) full_join(x, y, by = "gene"), summary_lis
 print(final_summary)
 ```
 
-```{r}
-cell_type_essential <- final_filtered %>% filter(rank == 11) %>% arrange(freq_significant_hatching_gland)
-
-cell_type_essential_hg <- unlist(cell_type_essential[2:7, "gene"])
-
-
-hg <- data.frame(final_filtered)
-rownames(hg) <- hg$gene
-hg <- hg[cell_type_essential_hg,]
-hg_mat <- as.matrix(hg %>% select(contains("mean")))
-
-# Define a function to add black borders to each cell
-border_fun <- function(j, i, x, y, width, height, fill) {
-  grid.rect(x = x, y = y, width = width, height = height, 
-            gp = gpar(col = "black", fill = fill))
-}
-Heatmap(hg_mat, 
-        col = colorRamp2(c(-5,0,5), c("blue","white", "red")),
-        cluster_rows = F, 
-        cluster_columns = F,
-        show_row_names = T,
-        cell_fun = border_fun,
-        rect_gp = gpar(type = "none"),
-        heatmap_legend_param = list(title = "log2FC"),
-        column_labels = c("global", "myotome", "somite", "endothelial", "blood", "neuron", "spinal cord", "neuron prog", "mb/hb", "telen.", "epidermal", "hatching gland"),
-        row_labels = translate(cell_type_essential_hg),
-        width = 1,
-        height = 1
-        )
-
-```
-
 # Global and Cell Type DA
 
 ```{r}
@@ -322,6 +290,7 @@ head(final_atac_iter)
 ```
 
 # Plotting
+
 ```{r}
 #read in master sheets
 master_genes <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
@@ -469,54 +438,6 @@ for(celltype in celltypes[2:length(celltypes)]){
 ```
 
 ```{r}
-# Reshape the data into long format for both avg_log2FC and p_val_adj
-long_ctd <- master_genes[ctd_genes,]
-long_ctd$gene <- rownames(long_ctd)
-
-long_ctd <- long_ctd %>%
-  pivot_longer(cols = starts_with("avg_log2FC"), 
-               names_to = "avg_log2FC_celltype", 
-               values_to = "avg_log2FC") %>%
-  pivot_longer(cols = starts_with("p_val_adj"), 
-               names_to = "p_val_adj_celltype", 
-               values_to = "p_val_adj") %>%
-  mutate(celltype = gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype)) %>%
-  filter(gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype) == gsub("avg_log2FC_|p_val_adj_", "", p_val_adj_celltype)) %>%
-  select(-avg_log2FC_celltype, -p_val_adj_celltype) # Clean up the column names
-
-long_ctd$celltype <- factor(long_ctd$celltype, unique(long_ctd$celltype))
-long_ctd$gene <- factor(long_ctd$gene, unique(long_ctd$gene))
-```
-
-```{r}
-p <- ggplot(long_ctd, aes(x = celltype, y = gene)) +
-  geom_point(aes(size = 1-p_val_adj, color = avg_log2FC), 
-             shape = 16) +  # Use a filled circle for the dots
-  scale_color_gradientn(
-    colors = c("blue", "blue", "white", "red", "red"),
-    breaks = c(-7,-2,0,2,7),
-    values = c(0,0.4,0.5,0.6,1),
-    limits = c(-7,7),
-    name = "dia vs dev log2FC"
-  ) +
-  scale_radius(
-    range = c(1,5),
-    labels = c("1", "0.75", "0.5", "0.25", "0"),
-    name = "adjusted p-val") +  # Size scale for the logFC, adjust range as necessary
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for clarity
-  labs(title = "Cell-Type Diapause Genes",
-       x = "Cell Types",
-       y = "Genes") +
-  theme(panel.grid = element_blank()) 
-
-SaveFigure(p, "ctd_genes_dotplot", type = "pdf", width = 10, height = length(ctd_genes)/6)
-
-```
-
-```{r}
-#PLOT HEATMAP
-
 #columns to include
 columns <- unique(ctd_genes$celltype)
 column_cols <- colors_broad[gsub("\\.", "/",columns)]
@@ -593,53 +514,6 @@ for(celltype in celltypes[2:length(celltypes)]){
 ```
 
 ```{r}
-# Reshape the data into long format for both avg_log2FC and p_val_adj
-long_ctd_peaks <- master_peaks[master_peaks$final_symbol %in% ctd_peaks,]
-# long_ctd_peaks$gene <- rownames(long_ctd_peaks)
-
-long_ctd_peaks <- long_ctd_peaks %>%
-  pivot_longer(cols = starts_with("avg_log2FC"), 
-               names_to = "avg_log2FC_celltype", 
-               values_to = "avg_log2FC") %>%
-  pivot_longer(cols = starts_with("p_val_adj"), 
-               names_to = "p_val_adj_celltype", 
-               values_to = "p_val_adj") %>%
-  mutate(celltype = gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype)) %>%
-  filter(gsub("avg_log2FC_|p_val_adj_", "", avg_log2FC_celltype) == gsub("avg_log2FC_|p_val_adj_", "", p_val_adj_celltype)) %>%
-  select(-avg_log2FC_celltype, -p_val_adj_celltype) # Clean up the column names
-
-
-long_ctd_peaks$celltype <- factor(long_ctd_peaks$celltype, unique(long_ctd_peaks$celltype))
-long_ctd_peaks$final_symbol <- factor(long_ctd_peaks$final_symbol, ctd_peaks)
-```
-
-```{r}
-p <- ggplot(long_ctd_peaks, aes(x = celltype, y = final_symbol)) +
-  geom_point(aes(size = 1-p_val_adj, color = avg_log2FC), 
-             shape = 16) +  # Use a filled circle for the dots
-  scale_color_gradientn(
-    colors = c("blue", "blue", "white", "red", "red"),
-    breaks = c(-7,-2,0,2,7),
-    values = c(0,0.4,0.5,0.6,1),
-    limits = c(-7,7),
-    name = "dia vs dev log2FC"
-  ) +
-  scale_radius(
-    range = c(1,5),
-    labels = c("1", "0.75", "0.5", "0.25", "0"),
-    name = "adjusted p-val") +  # Size scale for the logFC, adjust range as necessary
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for clarity
-  labs(title = "Cell-Type Diapause Peaks",
-       x = "Cell Types",
-       y = "Genes") +
-  theme(panel.grid = element_blank()) 
-
-
-SaveFigure(p, "ctd_peaks_dotplot", type = "pdf", width = 10, height = length(ctd_peaks)/6)
-```
-
-```{r}
 #PLOT HEATMAP
 
 #columns to include
@@ -702,7 +576,7 @@ VlnPlot(so, "LOC107391795", group.by = "annotation_broad", split.by = "devtraj" 
 ```
 
 ```{r}
-#Function to plot cell type peaks and cell type genes
+#Function to plot cell type peaks
 plot_ctd_peak <- function(
     so,
     peak,
@@ -718,16 +592,19 @@ plot_ctd_peak <- function(
 ){
   DefaultAssay(so) <- "ATAC"
   
+  #create metadata column for timepoints
   so$tp <- ifelse(so$timepoint %in% tp1, tp1.name, 
                   ifelse(so$timepoint %in% tp2, tp2.name, "other"))
   so$tp <- factor(so$tp, levels = c(tp1.name, tp2.name, "other"))
   
+  #subset object by cell type given
   Idents(so) <- "annotation_broad"
   so_sub <- subset(so, idents = ident)
   l <- levels(so_sub$tp)
   so_sub$tp <- paste0(so_sub$tp, "_", ident)
   so_sub$tp <- factor(so_sub$tp, levels = paste0(l, "_", ident))
 
+  #create coverage plot for cell type subset
   Idents(so_sub) <- "tp"
   ct_cov <- CoveragePlot(
     object = so_sub,
@@ -740,6 +617,7 @@ plot_ctd_peak <- function(
     extend.downstream = extend.downstream,
   ) & scale_fill_manual(values = c(tp1.color, tp2.color))
   
+  #create coverage plot for all cell types
   Idents(so) <- "tp"
   global_cov <- CoveragePlot(
     object = so,
@@ -752,6 +630,7 @@ plot_ctd_peak <- function(
     extend.downstream = extend.downstream,
   ) & scale_fill_manual(values = c(tp1.color, tp2.color))
   
+  #add peak plot
   peak_plot <- PeakPlot(
     so,
     region = peak,
@@ -759,6 +638,7 @@ plot_ctd_peak <- function(
     extend.downstream = extend.downstream
   )
   
+  #add gene plot
   gene_plot <- AnnotationPlot(
     so,
     region = peak,
@@ -766,7 +646,7 @@ plot_ctd_peak <- function(
     extend.downstream = extend.downstream
   )
   
-  
+  #combine and plot
   p <- CombineTracks(
     plotlist = list(ct_cov, global_cov, peak_plot, gene_plot),
     heights = c(10,10,1,2)
@@ -798,6 +678,7 @@ SaveFigure(p, "ctd_peak_example_2", width = 6, height = 6)
 ```
 
 ```{r}
+#function to plot cell type genes
 plot_ctd_gene <- function(
     so,
     gene,
@@ -810,16 +691,13 @@ plot_ctd_gene <- function(
     tp2.color = "#FD8D3C"
 ){
   DefaultAssay(so) <- "RNA"
+  
+  #create metadata column for timepoints given
   so$tp <- ifelse(so$timepoint %in% tp1, tp1.name, 
                   ifelse(so$timepoint %in% tp2, tp2.name, "other"))
   so$tp <- factor(so$tp, levels = c(tp1.name, tp2.name, "other"))
   
-  # Idents(so) <- "annotation_broad"
-  # so_sub <- subset(so, idents = ident)
-  # l <- levels(so_sub$tp)
-  # so_sub$tp <- paste0(so_sub$tp, "_", ident)
-  # so_sub$tp <- factor(so_sub$tp, levels = paste0(l, "_", ident))
-  
+  #create metadata column for celltype given
   so$ct <- ifelse(so$annotation_broad == ident, ident, "all others")
   
   Idents(so) <- "tp"
@@ -831,6 +709,8 @@ plot_ctd_gene <- function(
     idents = levels(so$tp)[1:2],
     cols = c(tp1.color, tp2.color),
     pt.size = 0)
+  
+  #add points manually for vln plot so that they can be colored
   p <- p + geom_jitter(mapping = aes(color = split), data = p$data,
     position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.9))+
     scale_color_manual(breaks = c(tp1.name,tp2.name), values = c(tp1.color, tp2.color))
@@ -925,7 +805,7 @@ plotEnrichment(fgsea_sets[["GOBP_FATTY_ACID_DERIVATIVE_METABOLIC_PROCESS"]],
                rankings) + labs(title="GOBP fatty acid")
 ```
 
-## Cell Type motifs
+# Cell Type motifs
 
 ```{r}
 dia_pct_thresh <- 0.01
@@ -988,6 +868,8 @@ group_celltype <- group_celltype %>% arrange(max_col)
 ct_motifs <- bind_rows(group_global, group_celltype) %>% select(-rank)
 ```
 
+## Plot Cell type Motifs
+
 ```{r}
 ct_motif_mat <- as.matrix(ct_motifs %>% column_to_rownames(var = "motif.name") %>% select(-max_col))
 
@@ -1022,6 +904,7 @@ hm <- draw(hm, heatmap_legend_side = "bottom")
 SaveFigure(hm, type = "png", "ct_motif_heatmap", height = 5, width = 25)
 
 ```
+
 ```{r}
 global <- MotifPlot(so, c("KLF4", "NFYB", "FOXO3", "CEBPE"))
 SaveFigure(global, "global_motifs", height = 3, width = 3)
@@ -1038,4 +921,3 @@ SaveFigure(neu_prog, "neu_prog_motifs", height = 1.5, width = 1.5)
 peri <- MotifPlot(so, c("SOX13"))
 SaveFigure(peri, "periderm_motifs", height = 1.5, width = 1.5)
 ```
-
