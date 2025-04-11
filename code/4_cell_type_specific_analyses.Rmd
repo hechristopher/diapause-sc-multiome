@@ -354,6 +354,8 @@ hm <- draw(hm, heatmap_legend_side = "bottom")
 SaveFigure(hm, type = "pdf", "global_gene_heatmap", height = 5, width = 25)
 SaveFigure(hm, type = "png", "global_gene_heatmap", height = 5, width = 25)
 
+
+# write.csv(FC_sig, "../results_scratch/global_diapause.csv")
 ```
 
 ## Plot global diapause peaks
@@ -405,7 +407,7 @@ SaveFigure(hm, type = "png", "global_peak_heatmap", height = 5, width = 25)
 
 ```
 
-##Plot cell type diapause genes
+## Plot cell type diapause genes
 
 ```{r}
 dia_pct_thresh <- 0.1
@@ -435,6 +437,9 @@ for(celltype in celltypes[2:length(celltypes)]){
     ctd_genes <- rbind(ctd_genes, genes)
   }
 }
+
+
+write.csv(ctd_genes %>% mutate(final_symbol = translate(gene)), "../results_scratch/ctd_genes.csv")
 ```
 
 ```{r}
@@ -547,7 +552,7 @@ hm <- Heatmap(
   show_column_names = F,
   rect_gp = gpar(col = "white", lwd = 0.5),
   right_annotation = ct_colors,
-  bottom_annotation = ctg_colors,
+  bottom_annotation = ctp_colors,
   heatmap_legend_param = list(title = "Fold Change in Diapause, adjusted p-val < 0.05", legend_direction = "horizontal"),
   width = unit(0.15*nrow(ctd_FC_sig), "cm"),
   height = unit(0.5*ncol(ctd_FC_sig), "cm")
