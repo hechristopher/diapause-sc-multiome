@@ -175,14 +175,36 @@ ggplot(subsampled_barcodes, aes(x = as.factor(timepoint_encoded2), y = predictio
 ```
 
 ```{r}
-coefs <- coef(m, s = "lambda.min"); 
-coefs <- coefs[coefs[,1]!=0,]
+#compute mse for each cell type
 
-coefs <- sort(coefs, decreasing = T)
+mse_by_cell_type <- subsampled_barcodes %>%
+  group_by(annotation_broad) %>%
+  summarise(mse = mean((timepoint_encoded2 - prediction_encoded2)^2))
 
-translate(names(coefs[2:20]))
 
-VlnPlot(so, features = names(coefs[2:20]), group.by = "timepoint_group")
+ggplot(subsampled_barcodes, aes(x = factor(timepoint_encoded2), y = prediction_encoded2)) +
+  geom_boxplot() +
+  facet_wrap(~ annotation_broad) +
+  labs(x = "Actual Timepoint", y = "Predicted Timepoint") +
+  theme_bw() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) + geom_text(data = mse_by_cell_type, aes(x = Inf, y = Inf, label = sprintf("MSE: %.2f", mse)),
+            hjust = 1.05, vjust = 12, size = 3.5)
+```
+## Store in Seurat Object
+```{r}
+meta <- so@meta.data
+meta <- merge(meta, prediction_encoded2_full, by = 0, all = T)
+rownames(meta) <- meta$Row.names
+meta <- meta[,-c(1)]
+so@meta.data <- meta
+
+
+library(paletteer)
+FeaturePlot(so, "lambda.min", cells = rownames(prediction_encoded2_full), reduction = "umap") + scale_color_gradientn(colors=viridis::magma(100))
+
 ```
 
 
