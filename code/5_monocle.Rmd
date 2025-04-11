@@ -18,13 +18,13 @@ source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/cod
 
 #Set Out Directories
 outs_dir <- "../results_all/"
-fig_path <- "../results_all/figures/"
+fig_dir <- "../results_all/figures/"
 ```
 
 
 ## Import Seurat Object
 ```{r}
-so <- readRDS(paste0(outs_dir, "so_annotated_atac_processed.rds"))
+so <- readRDS(paste0(outs_dir, "so_wnn.rds"))
 ```
 
 ## Create cds object from seurat object
@@ -33,7 +33,7 @@ First, subset only dev d1 samples and create cds object
 
 ```{r}
 so_dev <- readRDS(paste0(outs_dir, "markers_dev/so_dev.rds"))
-cds_dev <- as.cell_data_set(so_dev)
+cds_dev <- as.cell_data_set(so)
 
 #requires gene_short_name column
 rowData(cds_dev)$gene_short_name <- row.names(rowData(cds_dev))
@@ -46,7 +46,8 @@ cluster cells with monocle and plot
 cds_dev <- cluster_cells(cds_dev)
 p1 <- plot_cells(cds_dev, show_trajectory_graph = FALSE)
 p2 <- plot_cells(cds_dev, color_cells_by = "partition", show_trajectory_graph = FALSE)
-SaveFigure(p1+p2, "monocle/dev_clusters", height=3, width=5)
+p1+p2
+#SaveFigure(p1+p2, "monocle/dev_clusters", height=3, width=5)
 ```
 
 ```{r}
@@ -80,11 +81,12 @@ create trajectories in umap
 cds_dev <- learn_graph(cds_dev)
 
 p <- plot_cells(cds_dev,
-           color_cells_by = "annotation",
+           color_cells_by = "annotation_broad",
            label_groups_by_cluster=FALSE,
            label_leaves=FALSE,
            label_branch_points=FALSE)
-SaveFigure(p, "monocle/dev_trajectory", height=3, width=3)
+p
+#SaveFigure(p, "monocle/dev_trajectory", height=3, width=3)
 ```
 
 order cells in pseudotime
@@ -98,8 +100,8 @@ p <- plot_cells(cds_dev,
            label_leaves=FALSE,
            label_branch_points=FALSE,
            graph_label_size=1.5)
-
-SaveFigure(p, "monocle/dev_pseudotime", height=3, width=5)
+p
+#SaveFigure(p, "monocle/dev_pseudotime", height=3, width=5)
 ```
 
 investigate somite lineage
@@ -137,7 +139,7 @@ plot_cells(cds_dev_somite,
 DimPlot(so, group.by = "annotation_broad", reduction = "umap")
 
 
-# so_neurons <- subset(so, annotation_broad %in% c("myotome/muscle", "head_kidney", "somite", "myotome", "tail_bud"))
+so_neuron <- readRDS("../results_all/lineage_subsets/so_neurons.rds")
 # 
 # so_mesenchyme <- subset(so, annotation_broad %in% c("myotome/muscle", "head_kidney", "somite", "myotome", "tail_bud", "primitive_heart"))
 # 
@@ -156,9 +158,8 @@ so_hatch <- subset(so, annotation_broad %in% c("hatching_gland"))
 ## Run Monocle on Blood
 ```{r}
 runMonocle <- function(so){
-  so <- runSeuratRNAProcessing(so)
-  DimPlot(so, group.by = "timepoint_group")
-  cds <- as.cell_data_set(so)
+  DefaultAssay(so) <- "RNA"
+  cds <- as.cell_data_set(so, default.reduction = "umap.rna")
   rowData(cds)$gene_short_name <- translate(row.names(rowData(cds)))
   cds <- preprocess_cds(cds) 
   cds <- cluster_cells(cds)
@@ -423,4 +424,88 @@ venn.diagram(
   output=TRUE
 )
 
+```
+
+
+## Run Monocle on Neuron
+
+create trajectory through diapause for blood
+
+```{r}
+so_neuron@reductions$umap <- so_neuron@reductions$umap.rna
+
+cds <- runMonocle(so_neuron)
+
+p <- plot_cells(cds,
+           color_cells_by = "timepoint_group",
+           show_trajectory_graph = F,
+           label_cell_groups = F)
+SaveFigure(p, "monocle/neuron_umap", height=3, width=5)
+
+
+p1 <- plot_cells(cds,
+                 show_trajectory_graph = FALSE)
+p2 <- plot_cells(cds,
+                 color_cells_by = "partition",
+                 show_trajectory_graph = FALSE)
+SaveFigure(p1+p2,"monocle/neuron_clusters", height=3, width=5)
+
+p <- plot_cells(cds,
+           color_cells_by = "timepoint_group",
+           label_groups_by_cluster=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE)
+SaveFigure(p, "monocle/neuron_graph", height=3, width=5)
+
+p <- plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5)
+SaveFigure(p, "monocle/neuron_pseudotime", height=3, width=5)
+```
+
+compute genes and modules associated with diapause trajectory
+
+```{r}
+neuron_diapause_genes <- graph_test(cds, neighbor_graph="principal_graph")
+top_neuron_diapause_genes <- (neuron_diapause_genes %>% arrange(q_value) %>% top_n(-50, q_value))$gene_short_name
+```
+
+```{r}
+p <- plot_cells(cds, genes=top_neuron_diapause_genes,
+           show_trajectory_graph=FALSE,
+           label_cell_groups=FALSE,
+           label_leaves=FALSE)
+
+SaveFigure(p, "monocle/neuron_pseudo_genes", height=8, width=8)
+
+```
+
+```{r}
+module_genes <- row.names(neuron_diapause_genes %>% filter(q_value < 0.05))
+
+neuron_modules <- find_gene_modules(cds[module_genes,], resolution=0.001)
+
+
+agg_mat <- aggregate_gene_expression(cds, neuron_modules)
+module_dendro <- hclust(dist(agg_mat))
+neuron_modules$module <- factor(neuron_modules$module, 
+                                levels = row.names(agg_mat)[module_dendro$order])
+
+p <- plot_cells(cds,
+           genes=neuron_modules,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+
+SaveFigure(p, "monocle/neuron_pseudo_modules", height=5, width=5)
+
+```
+
+```{r}
+p <- plot_genes_in_pseudotime(cds[c("rbm5", "LOC107392522", "LOC107373896","arrdc3", "jarid2", "jade2"),],
+                              color_cells_by="timepoint_group")
+
+SaveFigure(p, "monocle/neuron_pseudotime_genes", width = 5, height =5)
 ```
