@@ -23,7 +23,7 @@ fig_path <- "../results_scratch/"
 
 
 ```{r}
-so <- readRDS("../results_all/so_annotated_atac_processed.rds")
+so <- readRDS("../results_all/so_wnn.rds")
 ```
 
 ## Figures for Lab Meeting 1/17
@@ -641,50 +641,82 @@ table(Idents(so_latedia))
 ```{r}
 # Read in List of Candidates
 genes <- read.csv(paste0(outs_dir, "parse_candidates_rui_20250318.csv"), row.names = 1)
+genes <- genes %>% filter(Count_in_intersects > 1)
 
 #read in master sheet
 master_genes <- read.csv("../results_all/master_genes_global_and_celltype.csv", row.names = 1)
+filtered_master <- master_genes[genes$Gene,]  %>% arrange(-avg_log2FC_global)
+
+genes_FC <- as.matrix(filtered_master %>% select(contains("FC")))
+genes_p_val <- as.matrix(filtered_master %>% select(contains("p_val_adj")))
+
+FC_sig <- genes_FC * ifelse(genes_p_val < 0.05, 1, NA)
 
 
-filtered_master <- master_genes[genes$Gene,]
+colnames(FC_sig) <- lapply(colnames(genes_FC), function(x) substring(x, 12))
+rownames(FC_sig) <- translate(rownames(genes_FC))
 
-
-filtered_master
-
-ge <- FetchData(so[["RNA"]], vars = (genes %>% filter(Count_in_intersects > 1))$Gene)
-
-ge$ct <- so$annotation_broad
-ge$diadev <- ifelse(so$timepoint_group %in% c("earlydia", "middia", "latedia"), "dia", "dev")
-
-#filter cts with less than 100 cells
-cts <- rownames(table(ge$ct, ge$diadev))[apply(table(ge$ct, ge$diadev), 1, function(row) all(row > 100))]
-ge <- ge %>% filter(ct %in% cts)
-
-avg_exp_diadev_celltype <- ge %>%
-  mutate(across(where(is.numeric), ~(.x - mean(.x))/sd(.x))) %>%
-  group_by(ct, diadev) %>% 
-  summarize_all(mean) %>%
-  ungroup() %>%
-  pivot_wider(names_from = diadev, values_from = where(is.numeric))
-
-pct_expressed <- ge %>%
-  group_by(ct, diadev) %>%
-  summarize_all(~ sum(.x != 0)/n()) %>%
-  ungroup() %>%
-  pivot_wider(names_from = diadev, values_from = where(is.numeric))
-
-
+library(circlize)
 library(ComplexHeatmap)
 
-Heatmap(as.matrix(pct_expressed %>% select(contains("dia"))), cluster_rows = F, cluster_columns = F, row_labels = avg_exp_diadev_celltype$ct)
+Heatmap(
+  t(FC_sig),
+  col = colorRamp2(breaks = c(-5,0,5), colors = c("blue","white", "red")),
+  na_col = "grey",
+  cluster_rows = F, 
+  cluster_columns = F,
+  show_row_names = T,
+  row_names_side = "left",
+  show_column_names = T,
+  rect_gp = gpar(col = "white", lwd = 0.5),
+  heatmap_legend_param = list(title = "Log2 Fold Change in Diapause", legend_direction = "horizontal"),
+)
 
-Heatmap(as.matrix(pct_expressed %>% select(contains("dev"))), cluster_rows = F, cluster_columns = F, row_labels = avg_exp_diadev_celltype$ct)
-
+write.csv(head(FC_sig, 20), paste0(outs_dir, "diapause_markers_parse_and_10x.csv"))
 ```
-#On disk storage and Sketch data
+# Expression Markers
 ```{r}
-so <- SketchData(so, ncells = 10000, method = "LeverageScore", sketched.assay = "sketch")
+DefaultAssay(so) <- "RNA"
 
-so
+markers <- FindAllMarkers(so, group.by = "annotation_broad")
+#markers_roc <- FindAllMarkers(so, group.by = "annotation_broad", test.use = "roc")
 ```
+
+
+```{r}
+ct_markers <- markers %>%
+  filter(pct.1 > 0.2 & avg_log2FC > 2 & p_val_adj < 0.005 & cluster != "hibernating_unknown") %>%
+  group_by(gene) %>%
+  mutate(row_count = n()) %>%
+  filter(row_count < 3) %>%
+  arrange(desc(pct.1)) %>%
+  slice_max(pct.1, n = 1) %>%
+  ungroup() %>%
+  group_by(cluster) %>%
+  slice_max(pct.1, n = 3)
+
+ct_marker_names <- translate(ct_markers$gene)
+
+DotPlot(so, features = ct_markers$gene, group.by = "annotation_broad") + RotatedAxis() + scale_x_discrete(labels=ct_marker_names)
+
+# SaveFigure(p, "1C_marker_dotplot", type = "png", width = 15, height = 8, res = 300)
+```
+
+```{r}
+#top 5 per cell type
+filtered_markers <- markers %>%
+  filter(pct.1 > 0.2 & avg_log2FC > 2 & p_val_adj < 0.005 & cluster != "hibernating_unknown") %>%
+  group_by(gene) %>%
+  mutate(row_count = n()) %>%
+  ungroup() %>% mutate(final_symbol = translate(gene)) %>%
+  select(gene, final_symbol, avg_log2FC, pct.1, pct.2, cluster, row_count)
+
+ct_markers <- filtered_markers %>%
+  group_by(cluster) %>%
+  slice_max(pct.1, n = 5) %>%
+  ungroup()
+
+write.csv(ct_markers, row.names = F, paste0(outs_dir, "ct_markers.csv"))
+```
+
 
