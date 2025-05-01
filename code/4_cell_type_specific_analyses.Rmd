@@ -812,6 +812,17 @@ plotEnrichment(fgsea_sets[["GOBP_FATTY_ACID_DERIVATIVE_METABOLIC_PROCESS"]],
 
 # Cell Type motifs
 
+read in files
+
+```{r}
+master_genes <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
+
+master_peaks <- read.csv(paste0(outs_dir, "master_peaks_global_and_celltype.csv"), row.names = 2)
+master_peaks <- master_peaks[,-1]
+```
+
+find cell type specific motifs
+
 ```{r}
 dia_pct_thresh <- 0.01
 p_val_adj_thresh <- 0.05
@@ -820,8 +831,10 @@ fc_thresh <- 0.5
 celltypes <- unique(sapply(colnames(master_peaks %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
 
 
-ct_motifs <- data.frame(fold.enrichment = numeric(), motif.name = character(), motif = character(), celltype = character())
+ct_motifs <- data.frame(fold.enrichment = numeric(),p.adjust = numeric(), motif.name = character(), motif = character(), celltype = character())
 
+
+#calculate motif enrichment in diapause peaks for each cell type
 for(celltype in celltypes[2:length(celltypes)]){
   peaks <- master_peaks %>% filter(
     .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
@@ -834,7 +847,7 @@ for(celltype in celltypes[2:length(celltypes)]){
     features = rownames(peaks)
   )
   
-  motifs <- enriched.motifs %>% filter(p.adjust < 0.05) %>% select(fold.enrichment, motif.name, motif)
+  motifs <- enriched.motifs %>% filter(p.adjust < 0.05) %>% select(fold.enrichment, p.adjust, motif.name, motif)
   
   if(nrow(motifs) > 0){
     motifs$celltype <- celltype
@@ -843,37 +856,66 @@ for(celltype in celltypes[2:length(celltypes)]){
   }
 }
 
+#pivot to make heatmap
 ct_motifs <- ct_motifs %>%
-  select(fold.enrichment, motif.name, celltype) %>%
+  select(fold.enrichment, p.adjust, motif.name, celltype) %>%
   pivot_wider(
     names_from = celltype,
-    values_from = fold.enrichment)
-
-ct_motifs$rank <- rowSums(!is.na(ct_motifs))-1
+    values_from = c(fold.enrichment, p.adjust))
 
 ```
 
+
+
+
+group motifs by global vs cell type specific
+
 ```{r}
+#calculate rowrank
+ct_motifs$rank <- rowSums(!is.na(ct_motifs[2:15]))
+
 group_global <- ct_motifs %>% filter(rank >= 4)
 group_global$max_col <- "global"
-
-group_celltype <- ct_motifs %>% filter(rank >= 1 & rank <= 3)
-
 group_global <- group_global %>% arrange(desc(rank))
 
 
+group_celltype <- ct_motifs %>% filter(rank >= 1 & rank <= 3)
 
 group_celltype <- group_celltype %>%
   rowwise() %>%
-  mutate(max_col = names(group_celltype)[which.max(c_across(2:15))+1]) %>%
+  mutate(max_col = celltypes[which.max(c_across(2:15))+1]) %>%
   ungroup()
-group_celltype$max_col <- factor(group_celltype$max_col, levels = names(group_celltype)[2:15])
+group_celltype$max_col <- factor(group_celltype$max_col, levels = celltypes)
 group_celltype <- group_celltype %>% arrange(max_col)
 
 ct_motifs <- bind_rows(group_global, group_celltype) %>% select(-rank)
 ```
 
-## Plot Cell type Motifs
+## Save to File
+
+```{r}
+
+#read in previous master_motifs file
+master_motifs <- read.csv(paste0(outs_dir, "master_motifs.csv"))
+
+#merge cell type motifs with master_motifs
+ct_motifs_tomerge <- ct_motifs %>% select(1, 2, 16, 3, 17, 4, 18, 5, 19, 6, 20, 7, 21,
+                                          8, 22, 9, 23, 10, 24, 11, 25, 12, 26, 13, 27,
+                                          14, 28, 15, 29, 30)
+colnames(ct_motifs_tomerge)[30] <- "group"
+
+master_motifs_ct <- merge(master_motifs, ct_motifs_tomerge, by.x = "motif.name.x", by.y = "motif.name", all = T)
+
+rownames(master_motifs_ct) <- master_motifs_ct$X
+master_motifs_ct <- master_motifs_ct %>% select(-motif.name.y, -X)
+
+write.csv(master_motifs_ct, paste0(outs_dir, "master_motifs_global_and_celltype.csv"))
+
+
+```
+
+
+## Plot Motifs
 
 ```{r}
 ct_motif_mat <- as.matrix(ct_motifs %>% column_to_rownames(var = "motif.name") %>% select(-max_col))
@@ -911,18 +953,70 @@ SaveFigure(hm, type = "png", "ct_motif_heatmap", height = 5, width = 25)
 ```
 
 ```{r}
+DefaultAssay(so) <- "ATAC"
+
 global <- MotifPlot(so, c("KLF4", "NFYB", "FOXO3", "CEBPE"))
 SaveFigure(global, "global_motifs", height = 3, width = 3)
 
 myotome <- MotifPlot(so, "POU3F4")
 SaveFigure(myotome, "myotome_motifs", height = 1.5, width = 1.5)
 
-diff_neu <- MotifPlot(so, c("CUX1", "ONECUT2"))
-SaveFigure(diff_neu, "diff_neu_motifs", height = 1.5, width = 3)
+diff_neu <- MotifPlot(so, c("CUX1"))
+SaveFigure(diff_neu, "diff_neu_motifs_1", height = 1.5, width = 3)
+
+diff_neu <- MotifPlot(so, c("ONECUT2"))
+SaveFigure(diff_neu, "diff_neu_motifs_2", height = 1.5, width = 3)
+
+diff_neu <- MotifPlot(so, c("HOXA1"))
+SaveFigure(diff_neu, "diff_neu_motifs_3", height = 1.5, width = 3)
 
 neu_prog <- MotifPlot(so, c("CTCF"))
 SaveFigure(neu_prog, "neu_prog_motifs", height = 1.5, width = 1.5)
 
+neu_prog <- MotifPlot(so, c("CTCFL"))
+SaveFigure(neu_prog, "neu_prog_motifs_1", height = 1.5, width = 1.5)
+
 peri <- MotifPlot(so, c("SOX13"))
 SaveFigure(peri, "periderm_motifs", height = 1.5, width = 1.5)
+
+
+neu <- MotifPlot(so, c("HES1"))
+SaveFigure(neu, "neuron_motifs_1", height = 1.5, width = 3)
+
+neu <- MotifPlot(so, c("NEUROD1"))
+SaveFigure(neu, "neuron_motifs_2", height = 1.5, width = 3)
+
+
+
+spine <- MotifPlot(so, c("FOSB::JUNB(var.2)"))
+SaveFigure(spine, "spinal_cord_motifs_1", height = 1.5, width = 3)
+
+spine <- MotifPlot(so, c("GRHL1"))
+SaveFigure(spine, "spinal_cord_motifs_2", height = 1.5, width = 3)
 ```
+```{r}
+#GLOBAL: rest, foxo3, tfe3/b
+
+global <- MotifPlot(so, c("REST"))
+SaveFigure(global, "global_motifs_1", height = 1.5, width = 3)
+global <- MotifPlot(so, c("FOXO3"))
+SaveFigure(global, "global_motifs_2", height = 1.5, width = 3)
+global <- MotifPlot(so, c("TFEB"))
+SaveFigure(global, "global_motifs_3", height = 1.5, width = 3)
+
+
+#npas2, bhlh40, neurod1, hes
+neu <- MotifPlot(so, c("Npas2"))
+SaveFigure(neu, "neu_1", height = 1.5, width = 3)
+neu <- MotifPlot(so, c("BHLHE40"))
+SaveFigure(neu, "neu_2", height = 1.5, width = 3)
+neu <- MotifPlot(so, c("NEUROD1"))
+SaveFigure(neu, "neu_3", height = 1.5, width = 3)
+neu <- MotifPlot(so, c("HES1"))
+SaveFigure(neu, "neu_4", height = 1.5, width = 3)
+neu <- MotifPlot(so, c("CTCF"))
+SaveFigure(neu, "neu_5", height = 1.5, width = 3)
+
+
+```
+

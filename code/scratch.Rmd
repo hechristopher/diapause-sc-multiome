@@ -18,7 +18,7 @@ source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/cod
 
 #Set Out Directories
 outs_dir <- "../results_scratch/"
-fig_path <- "../results_scratch/"
+fig_dir <- "../results_scratch/"
 ```
 
 
@@ -654,7 +654,7 @@ FC_sig <- genes_FC * ifelse(genes_p_val < 0.05, 1, NA)
 
 
 colnames(FC_sig) <- lapply(colnames(genes_FC), function(x) substring(x, 12))
-rownames(FC_sig) <- translate(rownames(genes_FC))
+# rownames(FC_sig) <- translate(rownames(genes_FC))
 
 library(circlize)
 library(ComplexHeatmap)
@@ -674,6 +674,18 @@ Heatmap(
 
 write.csv(head(FC_sig, 20), paste0(outs_dir, "diapause_markers_parse_and_10x.csv"))
 ```
+
+```{r}
+p <- DotPlot(so, features = rownames(FC_sig)[1:15], group.by = "timepoint_group") + RotatedAxis()
+SaveFigure(p,  "early_markers_dot", height = 4, width = 7)
+
+early_markers_exp <- p$data %>% pivot_wider(names_from = id, values_from = c(avg.exp.scaled, pct.exp), id_cols = features.plot) %>% select(features.plot, contains("predia"), contains("earlydia"), contains("middia"), contains("latedia"), contains("dev"))
+
+write.csv(early_markers_exp, paste0(outs_dir, "early_markers_exp.csv"))
+
+```
+
+
 # Expression Markers
 ```{r}
 DefaultAssay(so) <- "RNA"
@@ -719,4 +731,72 @@ ct_markers <- filtered_markers %>%
 write.csv(ct_markers, row.names = F, paste0(outs_dir, "ct_markers.csv"))
 ```
 
+```{r}
+p <- DotPlot(so, rownames(global_genes)[1:25], group.by = "devtraj")
+dia_markers_exp <- p$data %>% pivot_wider(names_from = id, values_from = c(avg.exp, pct.exp), id_cols = features.plot) %>% select(features.plot, contains("pre-dia"), contains("dia"), contains("dev"))
+```
+
+# Neuronal Subclustering
+```{r}
+#read in seurat object
+so_neuron <- readRDS("../results_all/so_neurons.rds")
+
+DefaultAssay(so_neuron) <- "RNA"
+DimPlot(so_neuron, reduction = "umap.rna")
+
+DimPlot(so_neuron, reduction = "umap.rna", group.by = "annotation_broad", cols = colors_broad, label = F) + NoAxes()
+```
+
+
+```{r}
+neuron_markers <- FindAllMarkers(so_neuron, only.pos = T)
+neuron_markers$final_symbol <- translate(neuron_markers$gene)
+
+neuron_markers_filtered <- neuron_markers %>%
+  group_by(cluster) %>%
+  filter(avg_log2FC > 1) %>%
+  top_n(-5, p_val_adj)
+
+write.csv(neuron_markers_filtered, "../results_all/neuron_markers.csv")
+  
+```
+
+
+```{r}
+so_neuron_dia <- subset(so_neuron, subset = diadev == "dia")
+
+so_neuron_dia <- NormalizeData(so_neuron_dia)
+so_neuron_dia <- FindVariableFeatures(so_neuron_dia)
+so_neuron_dia <- ScaleData(so_neuron_dia)
+so_neuron_dia <- RunPCA(so_neuron_dia, verbose = FALSE)
+so_neuron_dia <- RunUMAP(so_neuron_dia, dims = 1:30, reduction.name = "umap.rna")
+
+
+so_neuron_dia <- FindNeighbors(so_neuron_dia)
+so_neuron_dia <- FindClusters(so_neuron_dia, resolution = 0.5)
+
+```
+```{r}
+DimPlot(so_neuron_dia, reduction = "umap.rna", label = T, group.by = "timepoint")
+
+dia_neuron_markers <- FindAllMarkers(so_neuron_dia, only.pos = T)
+dia_neuron_markers$final_symbol <- translate(dia_neuron_markers$gene)
+
+
+dia_neuron_markers_filt <- dia_neuron_markers %>%
+  group_by(cluster) %>%
+  filter(avg_log2FC > 1 & p_val_adj < 0.05) %>%
+  top_n(-5, p_val_adj)
+
+```
+```{r}
+DefaultAssay(so) <- "RNA"
+
+features <- c("LOC107392522", "jade2", "fah", "rbm5")
+for(feature in features){
+  p <- FeaturePlot(so, features = feature, reduction = "umap", max.cutoff = 5) + NoAxes()
+  SaveFigure(p, paste0(feature, "_umap"), width = 5, height = 5)
+}
+
+```
 
