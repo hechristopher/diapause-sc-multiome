@@ -7,5 +7,6 @@ data*/
 genome*/
 results*/
 manuscript/
+GO/
 *.wynton*
 *.orcinus*

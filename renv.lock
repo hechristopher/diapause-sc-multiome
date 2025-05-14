@@ -86,6 +86,64 @@
       "Repository": "Bioconductor 3.20",
       "NeedsCompilation": "no"
     },
+    "AnnotationForge": {
+      "Package": "AnnotationForge",
+      "Version": "1.48.0",
+      "Source": "Bioconductor",
+      "Title": "Tools for building SQLite-based annotation data packages",
+      "Description": "Provides code for generating Annotation packages and their databases.  Packages produced are intended to be used with AnnotationDbi.",
+      "biocViews": "Annotation, Infrastructure",
+      "URL": "https://bioconductor.org/packages/AnnotationForge",
+      "BugReports": "https://github.com/Bioconductor/AnnotationForge/issues",
+      "License": "Artistic-2.0",
+      "Encoding": "UTF-8",
+      "Authors@R": "c( person(\"Marc\", \"Carlson\", role = \"aut\"), person(\"Hervé\", \"Pagès\", role = \"aut\"), person(\"Madelyn\", \"Carlson\", role = \"ctb\", comment = \"'Creating probe packages' vignette translation from Sweave to Rmarkdown / HTML\"), person(\"Bioconductor Package Maintainer\", role = \"cre\", email = \"maintainer@bioconductor.org\") )",
+      "Depends": [
+        "R (>= 3.5.0)",
+        "methods",
+        "utils",
+        "BiocGenerics (>= 0.15.10)",
+        "Biobase (>= 1.17.0)",
+        "AnnotationDbi (>= 1.33.14)"
+      ],
+      "Imports": [
+        "DBI",
+        "RSQLite",
+        "XML",
+        "S4Vectors",
+        "RCurl"
+      ],
+      "Suggests": [
+        "biomaRt",
+        "httr",
+        "GenomeInfoDb (>= 1.17.1)",
+        "Biostrings",
+        "affy",
+        "hgu95av2.db",
+        "human.db0",
+        "org.Hs.eg.db",
+        "Homo.sapiens",
+        "GO.db",
+        "rmarkdown",
+        "BiocStyle",
+        "knitr",
+        "BiocManager",
+        "BiocFileCache",
+        "RUnit"
+      ],
+      "VignetteBuilder": "knitr",
+      "BuildKeepEmpty": "TRUE",
+      "Collate": "makeAnnDbPkg.R sqlForge_utils.R sqlForge_baseMapBuilder.R sqlForge_schemaGen.R sqlForge_tableBuilder.R sqlForge_makeAnnPkgs.R sqlForge_wrapBaseDBPkgs.R sqlForge_seqnames.R makeProbePackage.R makeOrgPackage.R makeChipPackageFromDataFrames.R makeOrgPackageFromNCBI.R NCBI_getters.R makeInparanoidDbs.R test_AnnotationForge_package.R",
+      "Date": "2024-10-28",
+      "git_url": "https://git.bioconductor.org/packages/AnnotationForge",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "a22ccaf",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "Marc Carlson [aut], Hervé Pagès [aut], Madelyn Carlson [ctb] ('Creating probe packages' vignette translation from Sweave to Rmarkdown / HTML), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
     "AnnotationHub": {
       "Package": "AnnotationHub",
       "Version": "3.14.0",
@@ -850,6 +908,61 @@
       "Repository": "RSPM",
       "Encoding": "UTF-8"
     },
+    "Category": {
+      "Package": "Category",
+      "Version": "2.72.0",
+      "Source": "Bioconductor",
+      "Title": "Category Analysis",
+      "Authors@R": "c( person(\"Robert\", \"Gentleman\", role=\"aut\"), person(\"Seth\", \"Falcon\", role=\"ctb\"), person(\"Deepayan\", \"Sarkar\", role=\"ctb\"), person(\"Robert\", \"Castelo\", role=\"ctb\"), person(\"Bioconductor Package Maintainer\", email = \"maintainer@bioconductor.org\", role=\"cre\"))",
+      "Description": "A collection of tools for performing category (gene set enrichment) analysis.",
+      "License": "Artistic-2.0",
+      "Depends": [
+        "methods",
+        "stats4",
+        "BiocGenerics",
+        "AnnotationDbi",
+        "Biobase",
+        "Matrix"
+      ],
+      "Imports": [
+        "utils",
+        "stats",
+        "graph",
+        "RBGL",
+        "GSEABase",
+        "genefilter",
+        "annotate",
+        "DBI"
+      ],
+      "Suggests": [
+        "EBarrays",
+        "ALL",
+        "Rgraphviz",
+        "RColorBrewer",
+        "xtable (>= 1.4-6)",
+        "hgu95av2.db",
+        "KEGGREST",
+        "karyoploteR",
+        "geneplotter",
+        "limma",
+        "lattice",
+        "RUnit",
+        "org.Sc.sgd.db",
+        "GOstats",
+        "GO.db"
+      ],
+      "LazyLoad": "Yes",
+      "Collate": "AllClasses.R AllGenerics.R categoryToEntrezBuilder-methods.R categoryName-methods.R hyperg-methods.R hyperGTest-methods.R linearMTest-methods.R DatPkg-accessors.R ChrBandTree.R tree_visitor.R cb_test.R initialize-methods.R HyperGParams-accessors.R LinearMParams-accessors.R HyperGResult-accessors.R LinearMResult-accessors.R ChrMapHyperGResult-accessors.R ChrMapLinearMResult-accessors.R show-methods.R universeBuilder-methods.R utils.R MAPcode.R catcode.R cateGOryMatrix.R gseaperm.R summary-methods.R mouse.R",
+      "biocViews": "Annotation, GO, Pathways, GeneSetEnrichment",
+      "git_url": "https://git.bioconductor.org/packages/Category",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "343907a",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "Robert Gentleman [aut], Seth Falcon [ctb], Deepayan Sarkar [ctb], Robert Castelo [ctb], Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
     "ComplexHeatmap": {
       "Package": "ComplexHeatmap",
       "Version": "2.22.0",
@@ -1196,6 +1309,104 @@
       "License": "Artistic-2.0",
       "biocViews": "AnnotationData, FunctionalAnnotation",
       "NeedsCompilation": "no"
+    },
+    "GOstats": {
+      "Package": "GOstats",
+      "Version": "2.72.0",
+      "Source": "Bioconductor",
+      "Title": "Tools for manipulating GO and microarrays",
+      "Authors@R": "c( person(\"Robert\", \"Gentleman\", role=\"aut\"), person(\"Seth\", \"Falcon\", role=\"ctb\"), person(\"Robert\", \"Castelo\", role=\"ctb\"), person(\"Sonali\", \"Kumari\", role=\"ctb\", comment=\"Converted vignettes from Sweave to R Markdown / HTML.\"), person(\"Dennis\", \"Ndubi\", role=\"ctb\", comment=\"Converted GOstatsHyperG vignette from Sweave to R Markdown / HTML.\"), person(\"Bioconductor Package Maintainer\", role=\"cre\", email=\"maintainer@bioconductor.org\"))",
+      "Description": "A set of tools for interacting with GO and microarray data. A variety of basic manipulation tools for graphs, hypothesis testing and other simple calculations.",
+      "Depends": [
+        "R (>= 2.10)",
+        "Biobase (>= 1.15.29)",
+        "Category (>= 2.43.2)",
+        "graph"
+      ],
+      "Imports": [
+        "methods",
+        "stats",
+        "stats4",
+        "AnnotationDbi (>= 0.0.89)",
+        "GO.db (>= 1.13.0)",
+        "RBGL",
+        "annotate (>= 1.13.2)",
+        "AnnotationForge",
+        "Rgraphviz"
+      ],
+      "Suggests": [
+        "hgu95av2.db (>= 1.13.0)",
+        "ALL",
+        "multtest",
+        "genefilter",
+        "RColorBrewer",
+        "xtable",
+        "SparseM",
+        "GSEABase",
+        "geneplotter",
+        "org.Hs.eg.db",
+        "RUnit",
+        "BiocGenerics",
+        "BiocStyle",
+        "knitr"
+      ],
+      "License": "Artistic-2.0",
+      "Collate": "zzz.R AllClasses.R AllGenerics.R hyperGTest-methods.R GOHyperGResult-accessors.R GOgraph.R GOhyptest.R hyperGtable.R shortestPath.R triad.R OBOHyperGResult-accessors.R",
+      "biocViews": "Annotation, GO, MultipleComparison, GeneExpression, Microarray, Pathways, GeneSetEnrichment, GraphAndNetwork",
+      "VignetteBuilder": "knitr",
+      "git_url": "https://git.bioconductor.org/packages/GOstats",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "7306a7f",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "Robert Gentleman [aut], Seth Falcon [ctb], Robert Castelo [ctb], Sonali Kumari [ctb] (Converted vignettes from Sweave to R Markdown / HTML.), Dennis Ndubi [ctb] (Converted GOstatsHyperG vignette from Sweave to R Markdown / HTML.), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
+    "GSEABase": {
+      "Package": "GSEABase",
+      "Version": "1.68.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Gene set enrichment data structures and methods",
+      "Authors@R": "c( person(\"Martin\", \"Morgan\", role = \"aut\"), person(\"Seth\", \"Falcon\", role = \"aut\"), person(\"Robert\", \"Gentleman\", role = \"aut\"), person(\"Paul\", \"Villafuerte\", role = \"ctb\", comment = \"'GSEABase' vignette translation from Sweave to Rmarkdown / HTML\"), person(\"Bioconductor Package Maintainer\", role = \"cre\", email = \"maintainer@bioconductor.org\" ))",
+      "Description": "This package provides classes and methods to support Gene Set Enrichment Analysis (GSEA).",
+      "License": "Artistic-2.0",
+      "Depends": [
+        "R (>= 2.6.0)",
+        "BiocGenerics (>= 0.13.8)",
+        "Biobase (>= 2.17.8)",
+        "annotate (>= 1.45.3)",
+        "methods",
+        "graph (>= 1.37.2)"
+      ],
+      "Suggests": [
+        "hgu95av2.db",
+        "GO.db",
+        "org.Hs.eg.db",
+        "Rgraphviz",
+        "ReportingTools",
+        "testthat",
+        "BiocStyle",
+        "knitr",
+        "RUnit"
+      ],
+      "Imports": [
+        "AnnotationDbi",
+        "XML"
+      ],
+      "LazyLoad": "yes",
+      "Collate": "utilities.R AAA.R AllClasses.R AllGenerics.R getObjects.R methods-CollectionType.R methods-ExpressionSet.R methods-GeneColorSet.R methods-GeneIdentifierType.R methods-GeneSet.R methods-GeneSetCollection.R methods-OBOCollection.R",
+      "VignetteBuilder": "knitr",
+      "biocViews": "GeneExpression, GeneSetEnrichment, GraphAndNetwork, GO, KEGG",
+      "git_url": "https://git.bioconductor.org/packages/GSEABase",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "3766175",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "no",
+      "Author": "Martin Morgan [aut], Seth Falcon [aut], Robert Gentleman [aut], Paul Villafuerte [ctb] ('GSEABase' vignette translation from Sweave to Rmarkdown / HTML), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
     },
     "GeneOverlap": {
       "Package": "GeneOverlap",
@@ -2194,6 +2405,45 @@
       "Maintainer": "Gregory Jefferis <jefferis@gmail.com>",
       "Repository": "CRAN"
     },
+    "RBGL": {
+      "Package": "RBGL",
+      "Version": "1.82.0",
+      "Source": "Bioconductor",
+      "Title": "An interface to the BOOST graph library",
+      "Authors@R": "c( person(\"Vince\", \"Carey\", role = \"aut\", email = \"stvjc@channing.harvard.edu\"), person(\"Li\", \"Long\",  role = \"aut\", email = \"li.long@isb-sib.ch\"), person(\"R.\", \"Gentleman\", role = \"aut\"), person(\"Emmanuel\", \"Taiwo\", role = \"ctb\",  comment = \"Converted RBGL vignette from Sweave to RMarkdown / HTML.\"), person(\"Bioconductor Package Maintainer\", role = \"cre\", email = \"maintainer@bioconductor.org\"))",
+      "Depends": [
+        "graph",
+        "methods"
+      ],
+      "Imports": [
+        "methods"
+      ],
+      "Suggests": [
+        "Rgraphviz",
+        "XML",
+        "RUnit",
+        "BiocGenerics",
+        "BiocStyle",
+        "knitr"
+      ],
+      "Description": "A fairly extensive and comprehensive interface to the graph algorithms contained in the BOOST library.",
+      "License": "Artistic-2.0",
+      "URL": "http://www.bioconductor.org",
+      "LazyLoad": "yes",
+      "biocViews": "GraphAndNetwork, Network",
+      "LinkingTo": [
+        "BH"
+      ],
+      "VignetteBuilder": "knitr",
+      "git_url": "https://git.bioconductor.org/packages/RBGL",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "88aa55c",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "Vince Carey [aut], Li Long [aut], R. Gentleman [aut], Emmanuel Taiwo [ctb] (Converted RBGL vignette from Sweave to RMarkdown / HTML.), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
     "RColorBrewer": {
       "Package": "RColorBrewer",
       "Version": "1.1-3",
@@ -2773,6 +3023,45 @@
       "NeedsCompilation": "no",
       "Author": "Aaron Lun [aut, cre, cph]",
       "Maintainer": "Aaron Lun <infinite.monkeys.with.keyboards@gmail.com>"
+    },
+    "Rgraphviz": {
+      "Package": "Rgraphviz",
+      "Version": "2.50.0",
+      "Source": "Bioconductor",
+      "Title": "Provides plotting capabilities for R graph objects",
+      "Description": "Interfaces R with the AT and T graphviz library for plotting R graph objects from the graph package.",
+      "Authors@R": "c(person(c(\"Kasper\", \"Daniel\"), \"Hansen\", role = c(\"cre\", \"aut\"), email = \"kasperdanielhansen@gmail.com\"), person(\"Jeff\", \"Gentry\", role = \"aut\"), person(\"Li\", \"Long\", role = \"aut\"), person(\"Robert\", \"Gentleman\", role = \"aut\"), person(\"Seth\", \"Falcon\", role = \"aut\"), person(\"Florian\", \"Hahne\", role = \"aut\"), person(\"Deepayan\", \"Sarkar\", role = \"aut\"))",
+      "Depends": [
+        "R (>= 2.6.0)",
+        "methods",
+        "utils",
+        "graph",
+        "grid"
+      ],
+      "Imports": [
+        "stats4",
+        "graphics",
+        "grDevices"
+      ],
+      "Suggests": [
+        "RUnit",
+        "BiocGenerics",
+        "XML"
+      ],
+      "SystemRequirements": "optionally Graphviz (>= 2.16)",
+      "GraphvizDetails": "Graphviz 2.28.0",
+      "License": "EPL",
+      "LazyLoad": "Yes",
+      "Collate": "AllGenerics.R AllClasses.R SimpleMethods.R graphvizVersion.R graphviz_build_version.R agfunctions.R attrs.R graphLayout.R plotGraph.R plotUtils.R layoutGraph.R renderGraph.R graph_methods.R writers.R zzz.R",
+      "biocViews": "GraphAndNetwork, Visualization",
+      "git_url": "https://git.bioconductor.org/packages/Rgraphviz",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "afcb63b",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "Kasper Daniel Hansen [cre, aut], Jeff Gentry [aut], Li Long [aut], Robert Gentleman [aut], Seth Falcon [aut], Florian Hahne [aut], Deepayan Sarkar [aut]",
+      "Maintainer": "Kasper Daniel Hansen <kasperdanielhansen@gmail.com>"
     },
     "Rhdf5lib": {
       "Package": "Rhdf5lib",
@@ -7483,6 +7772,49 @@
       "Maintainer": "Jennifer Bryan <jenny@posit.co>",
       "Repository": "CRAN"
     },
+    "genefilter": {
+      "Package": "genefilter",
+      "Version": "1.88.0",
+      "Source": "Bioconductor",
+      "Title": "genefilter: methods for filtering genes from high-throughput experiments",
+      "Authors@R": "c( person(\"Robert\", \"Gentleman\", role = \"aut\"), person(\"Vincent J.\", \"Carey\", role = \"aut\"), person(\"Wolfgang\", \"Huber\", role = \"aut\"), person(\"Florian\", \"Hahne\", role = \"aut\"), person(\"Emmanuel\", \"Taiwo\", role = \"ctb\", comment = \"'howtogenefinder' vignette translation from Sweave to RMarkdown / HTML.\"), person(\"Khadijah\", \"Amusat\", role = \"ctb\", comment = \"Converted genefilter vignette from Sweave to RMarkdown / HTML.\"), person(\"Bioconductor Package Maintainer\", role = \"cre\", email = \"maintainer@bioconductor.org\"))",
+      "Description": "Some basic functions for filtering genes.",
+      "Suggests": [
+        "class",
+        "hgu95av2.db",
+        "tkWidgets",
+        "ALL",
+        "ROC",
+        "RColorBrewer",
+        "BiocStyle",
+        "knitr"
+      ],
+      "Imports": [
+        "MatrixGenerics (>= 1.11.1)",
+        "AnnotationDbi",
+        "annotate",
+        "Biobase",
+        "graphics",
+        "methods",
+        "stats",
+        "survival",
+        "grDevices"
+      ],
+      "License": "Artistic-2.0",
+      "LazyLoad": "yes",
+      "LazyData": "yes",
+      "Collate": "AllClasses.R AllGenerics.R all.R dist2.R eSetFilter.R fastT.R filter_volcano.R filtered_p.R genefinder.R half.range.mode.R kappa_p.R nsFilter.R rejection_plot.R rowROC-accessors.R rowSds.R rowpAUCs-methods.R rowttests-methods.R shorth.R zzz.R",
+      "biocViews": "Microarray",
+      "VignetteBuilder": "knitr",
+      "git_url": "https://git.bioconductor.org/packages/genefilter",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "f0d698a",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "Robert Gentleman [aut], Vincent J. Carey [aut], Wolfgang Huber [aut], Florian Hahne [aut], Emmanuel Taiwo [ctb] ('howtogenefinder' vignette translation from Sweave to RMarkdown / HTML.), Khadijah Amusat [ctb] (Converted genefilter vignette from Sweave to RMarkdown / HTML.), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
+    },
     "generics": {
       "Package": "generics",
       "Version": "0.1.3",
@@ -8427,6 +8759,50 @@
       "Maintainer": "Tal Galili <tal.galili@gmail.com>",
       "Repository": "CRAN",
       "Encoding": "UTF-8"
+    },
+    "graph": {
+      "Package": "graph",
+      "Version": "1.84.1",
+      "Source": "Bioconductor",
+      "Title": "graph: A package to handle graph data structures",
+      "Authors@R": "c( person(\"R\", \"Gentleman\", role = \"aut\"), person(\"Elizabeth\", \"Whalen\", role=\"aut\"), person(\"W\", \"Huber\", role=\"aut\"), person(\"S\", \"Falcon\", role=\"aut\"), person(\"Jeff\", \"Gentry\", role=\"aut\"), person(\"Paul\", \"Shannon\", role=\"aut\"), person(\"Halimat C.\", \"Atanda\", role = \"ctb\", comment = \"Converted 'MultiGraphClass' and 'GraphClass' vignettes from Sweave to RMarkdown / HTML.\" ),    person(\"Paul\", \"Villafuerte\", role = \"ctb\", comment = \"Converted vignettes from Sweave to RMarkdown / HTML.\" ), person(\"Aliyu Atiku\", \"Mustapha\", role = \"ctb\", comment = \"Converted 'Graph' vignette from Sweave to RMarkdown / HTML.\" ), person(\"Bioconductor Package Maintainer\", role = \"cre\", email = \"maintainer@bioconductor.org\" ))",
+      "Description": "A package that implements some simple graph handling capabilities.",
+      "License": "Artistic-2.0",
+      "Depends": [
+        "R (>= 2.10)",
+        "methods",
+        "BiocGenerics (>= 0.13.11)"
+      ],
+      "Imports": [
+        "stats",
+        "stats4",
+        "utils"
+      ],
+      "Suggests": [
+        "SparseM (>= 0.36)",
+        "XML",
+        "RBGL",
+        "RUnit",
+        "cluster",
+        "BiocStyle",
+        "knitr"
+      ],
+      "Enhances": [
+        "Rgraphviz"
+      ],
+      "Collate": "AllClasses.R AllGenerics.R bitarray.R buildDepGraph.R methods-graph.R graphNEL.R clustergraph.R NELhandler.R edgefunctions.R graphfunctions.R GXLformals.R gxlReader.R random.R write.tlp.R mat2graph.R settings.R zzz.R standardLabeling.R TODOT.R toDotWithRI.R methods-graphAM.R attrData.R reverseEdgeDirections.R nodes-methods.R methods-multiGraph.R MultiGraph.R methods-graphBAM.R graph-constructors.R",
+      "LazyLoad": "yes",
+      "biocViews": "GraphAndNetwork",
+      "RoxygenNote": "7.2.3",
+      "VignetteBuilder": "knitr",
+      "git_url": "https://git.bioconductor.org/packages/graph",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "41ac6e9",
+      "git_last_commit_date": "2024-12-30",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "R Gentleman [aut], Elizabeth Whalen [aut], W Huber [aut], S Falcon [aut], Jeff Gentry [aut], Paul Shannon [aut], Halimat C. Atanda [ctb] (Converted 'MultiGraphClass' and 'GraphClass' vignettes from Sweave to RMarkdown / HTML.), Paul Villafuerte [ctb] (Converted vignettes from Sweave to RMarkdown / HTML.), Aliyu Atiku Mustapha [ctb] (Converted 'Graph' vignette from Sweave to RMarkdown / HTML.), Bioconductor Package Maintainer [cre]",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>"
     },
     "graphlayouts": {
       "Package": "graphlayouts",
@@ -12550,7 +12926,7 @@
     },
     "reticulate": {
       "Package": "reticulate",
-      "Version": "1.40.0",
+      "Version": "1.42.0",
       "Source": "Repository",
       "Type": "Package",
       "Title": "Interface to 'Python'",
@@ -12596,7 +12972,7 @@
       "NeedsCompilation": "yes",
       "Author": "Tomasz Kalinowski [ctb, cre], Kevin Ushey [aut], JJ Allaire [aut], RStudio [cph, fnd], Yuan Tang [aut, cph] (<https://orcid.org/0000-0001-5243-233X>), Dirk Eddelbuettel [ctb, cph], Bryan Lewis [ctb, cph], Sigrid Keydana [ctb], Ryan Hafen [ctb, cph], Marcus Geelnard [ctb, cph] (TinyThread library, http://tinythreadpp.bitsnbites.eu/)",
       "Maintainer": "Tomasz Kalinowski <tomasz@posit.co>",
-      "Repository": "CRAN"
+      "Repository": "RSPM"
     },
     "rhdf5": {
       "Package": "rhdf5",
