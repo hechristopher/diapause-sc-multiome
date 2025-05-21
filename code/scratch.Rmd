@@ -2,19 +2,18 @@
 title: "scratch"
 ---
 
+## Initialize
 ```{r}
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+#load extra packages
 suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
   library(readxl)
   library(scCustomize)
   library(Polychrome)
 })
 
-#Load Helper Functions
-source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
 #Set Out Directories
 outs_dir <- "../results_scratch/"
@@ -797,6 +796,232 @@ for(feature in features){
   p <- FeaturePlot(so, features = feature, reduction = "umap", max.cutoff = 5) + NoAxes()
   SaveFigure(p, paste0(feature, "_umap"), width = 5, height = 5)
 }
+
+```
+
+
+#Cell Type Specific Linkages
+```{r}
+so_neuron <- readRDS("../results_all/so_neurons.rds")
+```
+
+```{r}
+so_neuron <- LinkPeaks(
+  object = so_neuron,
+  peak.assay = "ATAC",
+  expression.assay = "RNA"
+)
+```
+```{r}
+linkages <- as.data.frame(Links(so_neuron))
+write.csv(linkages, "../results_scratch/neuron_linkages.csv", quote = F)
+
+read_linkages <- read.csv("../results_scratch/neuron_linkages.csv", row.names = 1)
+
+master_peaks <- read.csv("../results_all/master_peaks_global_and_celltype.csv")
+```
+
+
+# coverage plots for diapause genes
+
+```{r}
+so <- readRDS("../results_all/so_wnn.rds")
+
+## If fragments file cannot be found
+# frags <- Fragments(so)  # get list of fragment objects
+# Fragments(so) <- NULL  # remove fragment information from assay
+# newpath <- "C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/data_aggr_batch1-3/atac_fragments.tsv.gz"
+# frags[[1]] <- UpdatePath(frags[[1]], new.path = newpath)  # update path. Do this for any/all fragment objects in the list
+# Fragments(so) <- frags  # assign update list of fragment objects back to the assay
+# 
+# saveRDS(so, "../results_all/so_wnn.rds")
+```
+
+```{r}
+all_links <- as.data.frame(Links(so))
+
+all_links <- all_links %>% 
+  group_by(gene) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  mutate(final.symbol = translate(gene)) 
+```
+
+```{r}
+
+DefaultAssay(so) <- "ATAC"
+
+genes <- c("LOC107392522", "jade2", "fah", "rbm5")
+for(gene in genes){
+  p <- CoveragePlot(
+    so,
+    region = gene,
+    features = gene,
+    annotation = T,
+    peaks = F
+  )
+  plot(p)
+}
+
+
+```
+
+#GO Testing
+
+```{r}
+so <- readRDS("../results_all/so_wnn.rds")
+```
+
+```{r}
+master_genes <- read.csv("../results_all/master_genes_global_and_celltype.csv", row.names = 1)
+master_peaks <- read.csv("../results_all/master_peaks_global_and_celltype.csv", row.names = 2)
+global_genes <- read.csv("../results_scratch/global_diapause_genes.csv", row.names = 1)
+global_peaks <- read.csv("../results_scratch/global_diapause_peaks.csv")
+ctd_genes <- read.csv("../results_scratch/ctd_genes.csv", row.names = 1)
+ctd_peaks <- read.csv("../results_scratch/ctd_peaks.csv", row.names = 1)
+```
+
+```{r}
+master_peaks
+```
+
+```{r}
+neuron_peaks = (ctd_peaks %>% filter(celltype == "myotome.muscle"))$peak
+
+neuron_peaks_master = master_peaks[neuron_peaks,] %>% filter(peak_annotation != "intergenic")
+```
+
+
+```{r}
+go <- run_killifish_go(neuron_peaks_master$gene_name, rownames(master_genes))
+go_genes <- run_killifish_go(neuron_peaks_master$gene_name, rownames(master_genes), get_genes = T)
+```
+
+```{r}
+genes <- neuron_peaks_master$gene_name
+translate(genes[genes %in% go_genes$"GO:0010721"])
+genes[genes %in% go_genes$"GO:0010721"]
+```
+```{r}
+go_peaks <- run_killifish_go(
+  genes = translate(global_peaks$X, from = "N. furzeri Final Symbol", to = "N. furzeri (NCBI)"),
+  universe = rownames(master_genes)
+)
+
+go_genes <- run_killifish_go(
+  genes = translate(rownames(global_genes), from = "N. furzeri Final Symbol", to = "N. furzeri (NCBI)"),
+  universe = rownames(master_genes)
+)
+```
+
+```{r}
+
+#go_plot <- go %>% top_n(-10, padj) %>% arrange(desc(Count))
+go_plot <- go[c("1","2","3","4","5","11","39","47","122","169","170"),] %>% arrange(desc(Count))
+go_plot$Term <- factor(go_plot$Term, levels = rev(go_plot$Term))
+
+ggplot(data=go_plot)+
+  geom_bar(aes(x=Term, y=Count, fill=padj), stat='identity')+
+  coord_flip() + scale_fill_gradient(low="red", high = "blue", limits = c(0, 0.05))+ 
+  xlab("Term") + ylab("Gene count") + 
+  scale_y_continuous(limits = c(0,50)) + scale_x_discrete(expand=c(0,0))+
+  theme_bw(base_size = 20)
+
+
+```
+```{r}
+plot_dia_vs_dev_peak <- function(
+    so,
+    peak,
+    ident,
+    tp1,
+    tp2,
+    tp1.name = "dia",
+    tp1.color = "#6BAED6",
+    tp2.name = "dev",
+    tp2.color = "#FD8D3C",
+    extend.upstream = 5000,
+    extend.downstream = 5000
+){
+  DefaultAssay(so) <- "ATAC"
+  
+  #create metadata column for timepoints
+  so$tp <- ifelse(so$timepoint %in% tp1, tp1.name, 
+                  ifelse(so$timepoint %in% tp2, tp2.name, "other"))
+  so$tp <- factor(so$tp, levels = c(tp1.name, tp2.name, "other"))
+  
+  #subset object by cell type given
+  Idents(so) <- "annotation_broad"
+  so_sub <- subset(so, idents = ident)
+  l <- levels(so_sub$tp)
+  so_sub$tp <- paste0(so_sub$tp, "_", ident)
+  so_sub$tp <- factor(so_sub$tp, levels = paste0(l, "_", ident))
+
+  #create coverage plot for cell type subset
+  Idents(so_sub) <- "tp"
+  ct_cov <- CoveragePlot(
+    object = so_sub,
+    region = peak,
+    annotation = F,
+    peaks = F,
+    links = F,
+    idents = levels(so_sub$tp)[1:2],
+    extend.upstream = extend.upstream,
+    extend.downstream = extend.downstream,
+  ) & scale_fill_manual(values = c(tp1.color, tp2.color))
+  return(ct_cov)
+}
+```
+
+```{r}
+cts <- unique(ctd_genes$celltype)
+plots <- list()
+for(i in 1:length(cts)){
+  plot <- plot_dia_vs_dev_peak(
+    so,
+    peak = "NC.029650.1-48333208-48334035",
+    ident = gsub("\\.", "/", cts[i]), 
+    tp1 = c("dia6d", "dia1mo"),
+    tp2 = c("hb", "dev1d")
+  )
+  plots[[i]] <- plot
+}
+
+p <- CombineTracks(
+  plotlist = plots,
+  heights = rep(5, 8)
+)
+
+p
+
+```
+```{r}
+hg_dia <- WhichCells(so, expression = annotation_broad == "hatching_gland" & timepoint %in% c("dia6d", "dia1mo"))
+hg_dev <- WhichCells(so, expression = annotation_broad == "hatching_gland" & timepoint %in% c("hb", "dev1d"))
+ao_dia <- WhichCells(so, expression = annotation_broad != "hatching_gland" & timepoint %in% c("dia6d", "dia1mo"))
+ao_dev <- WhichCells(so, expression = annotation_broad != "hatching_gland" & timepoint %in% c("hb", "dev1d"))
+
+DefaultAssay(so) <- "RNA"
+FindMarkers(
+  so,
+  ident.1 = ao_dia,
+  ident.2 = ao_dev,
+  features = "sptssb",
+  min.pct = 0
+)
+
+
+```
+
+```{r}
+DimPlot(so_neuron, reduction = "umap.rna", group.by = "annotation_broad", cols = colors_broad) + NoAxes() + NoLegend()
+```
+```{r}
+DefaultAssay(so) <- "RNA"
+
+FeaturePlot(so, features = c("elavl3"), reduction = "umap") + NoAxes()
+FeaturePlot(so, features = c("LOC107374948"), reduction = "umap") + NoAxes()
+FeaturePlot(so, features = c("epcam"), reduction = "umap") + NoAxes()
 
 ```
 
