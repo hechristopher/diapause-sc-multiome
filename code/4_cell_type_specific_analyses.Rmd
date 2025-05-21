@@ -320,7 +320,7 @@ global_genes <- master_genes %>% filter(
 
 #columns to include
 columns <- unique(sapply(colnames(master_genes %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
-#columns <- columns[-1]
+#columns <- columns[-1] #remove global column
 column_cols <- colors_broad[gsub("\\.", "/",columns)]
 column_cols[1] <- "#2171B5"
 names(column_cols) <- columns
@@ -328,6 +328,8 @@ names(column_cols) <- columns
 
 FC <- as.matrix(global_genes %>% select(all_of(paste0("avg_log2FC_", columns))))
 pval <- as.matrix(global_genes %>% select(all_of(paste0("p_val_adj_", columns))))
+
+
 
 FC_sig <- FC * ifelse(pval < 0.05, 1, NA)
 colnames(FC_sig) <- columns
@@ -355,8 +357,127 @@ SaveFigure(hm, type = "pdf", "global_gene_heatmap", height = 5, width = 25)
 SaveFigure(hm, type = "png", "global_gene_heatmap", height = 5, width = 25)
 
 
-# write.csv(FC_sig, "../results_scratch/global_diapause.csv")
+# write.csv(FC_sig, "../results_scratch/global_diapause_genes.csv")
 ```
+
+## Plot cell type diapause genes
+
+```{r}
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 1
+rank_thresh <- 3
+
+#rank each gene by number of cell types in which it is significantly DE
+master_genes$rank <- rowSums(ifelse(master_genes %>% select(contains("p_val_adj")) < p_val_adj_thresh, 1, 0) == 1)
+
+celltypes <- unique(sapply(colnames(master_genes %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
+
+ctd_genes <- data.frame(avg_log2FC = numeric(), gene = character(), celltype = character())
+for(celltype in celltypes[2:length(celltypes)]){
+  genes <- master_genes %>% filter(
+    .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
+    .data[[paste0("p_val_adj_", celltype)]] < p_val_adj_thresh &
+    .data[[paste0("avg_log2FC_", celltype)]] > fc_thresh &
+    rank < rank_thresh
+  ) %>% arrange(desc(.data[[paste0("avg_log2FC_", celltype)]])) %>% select(paste0("avg_log2FC_", celltype))
+  
+  if(nrow(genes) > 0){
+    genes$gene <- rownames(genes)
+    rownames(genes) <- NULL
+    genes$celltype <- celltype
+    colnames(genes) <- colnames(ctd_genes)
+    ctd_genes <- rbind(ctd_genes, genes)
+  }
+}
+
+
+# write.csv(ctd_genes %>% mutate(final_symbol = translate(gene)), "../results_scratch/ctd_genes.csv")
+```
+
+```{r}
+#columns to include
+columns <- unique(ctd_genes$celltype)
+column_cols <- colors_broad[gsub("\\.", "/",columns)]
+names(column_cols) <- columns
+
+#genes to include
+ctd_genes <- ctd_genes %>%
+  group_by(gene) %>%
+  filter(avg_log2FC == max(avg_log2FC)) %>%
+  ungroup()
+
+ctd_FC <- as.matrix(master_genes[ctd_genes$gene,] %>% select(all_of(paste0("avg_log2FC_", columns))))
+ctd_pval <- as.matrix(master_genes[ctd_genes$gene,] %>% select(all_of(paste0("p_val_adj_", columns))))
+
+ctd_FC_sig <- ctd_FC * ifelse(ctd_pval < 0.05, 1, NA)
+colnames(ctd_FC_sig) <- columns
+rownames(ctd_FC_sig) <- translate(ctd_genes$gene)
+
+
+ct_colors = rowAnnotation(ct = columns, col = list(ct = column_cols), show_legend=F, show_annotation_name=F)
+ctg_colors = HeatmapAnnotation(ctg = ctd_genes$celltype, col = list(ctg = column_cols), show_legend = F, show_annotation_name = F, simple_anno_size = unit(0.3, "cm"))
+
+hm <- Heatmap(
+  t(ctd_FC_sig),
+  col = colorRamp2(breaks = c(-5,0,0.1,5,7), colors = c("blue","white", "pink", "red", "red")),
+  na_col = "grey90",
+  cluster_rows = F, 
+  cluster_columns = F,
+  show_column_names = F,
+  rect_gp = gpar(col = "white", lwd = 0.5),
+  right_annotation = ct_colors,
+  top_annotation = ctg_colors,
+  heatmap_legend_param = list(title = "Fold Change in Diapause, adjusted p-val < 0.05", legend_direction = "horizontal"),
+  width = unit(0.15*nrow(ctd_FC_sig), "cm"),
+  height = unit(0.5*ncol(ctd_FC_sig), "cm")
+)
+
+hm <- draw(hm, heatmap_legend_side = "bottom")
+SaveFigure(hm, type = "pdf", "ctd_gene_heatmap", height = 5, width = 15)
+SaveFigure(hm, type = "png", "ctd_gene_heatmap", height = 5, width = 15)
+
+```
+
+## Plot merged genes
+```{r}
+merged_FC_sig <- as.matrix(bind_rows(as.data.frame(FC_sig), as.data.frame(ctd_FC_sig)))
+
+column_cols <- colors_broad[gsub("\\.", "/",colnames(merged_FC_sig))]
+names(column_cols) <- colnames(merged_FC_sig)
+column_cols[1] <- "#2171B5"
+
+
+merged_FC_sig <- merged_FC_sig[,-1] # remove global column
+
+
+ct_colors = rowAnnotation(ct = colnames(merged_FC_sig), col = list(ct = column_cols), show_legend=F, show_annotation_name=F)
+ctg_colors = HeatmapAnnotation(
+  ctg = c(rep("global", nrow(FC_sig)), ctd_genes$celltype),
+  col = list(ctg = column_cols),
+  show_legend = F, show_annotation_name = F, simple_anno_size = unit(0.3, "cm"))
+
+
+hm <- Heatmap(
+  t(merged_FC_sig),
+  col = colorRamp2(breaks = c(-5,0,0.1,5,7), colors = c("blue","white", "pink", "red", "red")),
+  na_col = "grey90",
+  cluster_rows = F, 
+  cluster_columns = F,
+  show_column_names = F,
+  rect_gp = gpar(col = "white", lwd = 0.5),
+  right_annotation = ct_colors,
+  top_annotation = ctg_colors,
+  heatmap_legend_param = list(title = "Fold Change in Diapause, adjusted p-val < 0.05", legend_direction = "horizontal"),
+  width = unit(0.2*nrow(merged_FC_sig), "cm"),
+  height = unit(0.5*ncol(merged_FC_sig), "cm"),
+  column_split = c(rep("(1) global",nrow(FC_sig)), rep("(2) ctd",nrow(ctd_FC_sig)))
+)
+
+SaveFigure(hm, type = "png", "merged_global_ctd_gene_heatmap", height = 5, width = 20)
+
+```
+
 
 ## Plot global diapause peaks
 
@@ -405,86 +526,11 @@ hm <- draw(hm, heatmap_legend_side = "bottom")
 SaveFigure(hm, type = "pdf", "global_peak_heatmap", height = 5, width = 25)
 SaveFigure(hm, type = "png", "global_peak_heatmap", height = 5, width = 25)
 
-```
-
-## Plot cell type diapause genes
-
-```{r}
-dia_pct_thresh <- 0.1
-p_val_adj_thresh <- 0.05
-fc_thresh <- 1
-rank_thresh <- 3
-
-#rank each gene by number of cell types in which it is significantly DE
-master_genes$rank <- rowSums(ifelse(master_genes %>% select(contains("p_val_adj")) < p_val_adj_thresh, 1, 0) == 1)
-
-celltypes <- unique(sapply(colnames(master_genes %>% select(contains("pct.1"))), function(x) sub("pct.1_*", "", x)))
-
-ctd_genes <- data.frame(avg_log2FC = numeric(), gene = character(), celltype = character())
-for(celltype in celltypes[2:length(celltypes)]){
-  genes <- master_genes %>% filter(
-    .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
-    .data[[paste0("p_val_adj_", celltype)]] < p_val_adj_thresh &
-    .data[[paste0("avg_log2FC_", celltype)]] > fc_thresh &
-    rank < rank_thresh
-  ) %>% arrange(desc(.data[[paste0("avg_log2FC_", celltype)]])) %>% select(paste0("avg_log2FC_", celltype))
-  
-  if(nrow(genes) > 0){
-    genes$gene <- rownames(genes)
-    rownames(genes) <- NULL
-    genes$celltype <- celltype
-    colnames(genes) <- colnames(ctd_genes)
-    ctd_genes <- rbind(ctd_genes, genes)
-  }
-}
-
-
-write.csv(ctd_genes %>% mutate(final_symbol = translate(gene)), "../results_scratch/ctd_genes.csv")
-```
-
-```{r}
-#columns to include
-columns <- unique(ctd_genes$celltype)
-column_cols <- colors_broad[gsub("\\.", "/",columns)]
-names(column_cols) <- columns
-
-#genes to include
-ctd_genes <- ctd_genes %>%
-  group_by(gene) %>%
-  filter(avg_log2FC == max(avg_log2FC)) %>%
-  ungroup()
-
-ctd_FC <- as.matrix(master_genes[ctd_genes$gene,] %>% select(all_of(paste0("avg_log2FC_", columns))))
-ctd_pval <- as.matrix(master_genes[ctd_genes$gene,] %>% select(all_of(paste0("p_val_adj_", columns))))
-
-ctd_FC_sig <- ctd_FC * ifelse(ctd_pval < 0.05, 1, NA)
-colnames(ctd_FC_sig) <- columns
-rownames(ctd_FC_sig) <- translate(ctd_genes$gene)
-
-
-ct_colors = rowAnnotation(ct = columns, col = list(ct = column_cols), show_legend=F, show_annotation_name=F)
-ctg_colors = HeatmapAnnotation(ctg = ctd_genes$celltype, col = list(ctg = column_cols), show_legend = F, show_annotation_name = F, simple_anno_size = unit(0.3, "cm"))
-
-hm <- Heatmap(
-  t(ctd_FC_sig),
-  col = colorRamp2(breaks = c(-5,0,0.1,5,7), colors = c("blue","white", "pink", "red", "red")),
-  na_col = "grey90",
-  cluster_rows = F, 
-  cluster_columns = F,
-  show_column_names = F,
-  rect_gp = gpar(col = "white", lwd = 0.5),
-  right_annotation = ct_colors,
-  top_annotation = ctg_colors,
-  heatmap_legend_param = list(title = "Fold Change in Diapause, adjusted p-val < 0.05", legend_direction = "horizontal"),
-  width = unit(0.15*nrow(ctd_FC_sig), "cm"),
-  height = unit(0.5*ncol(ctd_FC_sig), "cm")
-)
-
-hm <- draw(hm, heatmap_legend_side = "bottom")
-SaveFigure(hm, type = "pdf", "ctd_gene_heatmap", height = 5, width = 15)
-SaveFigure(hm, type = "png", "ctd_gene_heatmap", height = 5, width = 15)
+# write.csv(FC_sig, "../results_scratch/global_diapause_peaks.csv")
 
 ```
+
+
 
 ## Plot cell type diapause peaks
 
@@ -516,6 +562,8 @@ for(celltype in celltypes[2:length(celltypes)]){
     ctd_peaks <- rbind(ctd_peaks, peaks)
   }
 }
+
+write.csv(ctd_peaks, "../results_scratch/ctd_peaks.csv")
 ```
 
 ```{r}
@@ -564,6 +612,45 @@ SaveFigure(hm, type = "png", "ctd_peak_heatmap", height = 5, width = 25)
 
 ```
 
+
+## Plot merged peaks
+```{r}
+merged_FC_sig <- as.matrix(bind_rows(as.data.frame(FC_sig), as.data.frame(ctd_FC_sig)))
+
+column_cols <- colors_broad[gsub("\\.", "/",colnames(merged_FC_sig))]
+names(column_cols) <- colnames(merged_FC_sig)
+column_cols[1] <- "#2171B5"
+
+
+merged_FC_sig <- merged_FC_sig[,-1] # remove global column
+
+
+ct_colors = rowAnnotation(ct = colnames(merged_FC_sig), col = list(ct = column_cols), show_legend=F, show_annotation_name=F)
+ctg_colors = HeatmapAnnotation(
+  ctg = c(rep("global", nrow(FC_sig)), ctd_peaks$celltype),
+  col = list(ctg = column_cols),
+  show_legend = F, show_annotation_name = F, simple_anno_size = unit(0.3, "cm"))
+
+
+hm <- Heatmap(
+  t(merged_FC_sig),
+  col = colorRamp2(breaks = c(-5,0,0.1,5,7), colors = c("blue","white", "pink", "red", "red")),
+  na_col = "grey90",
+  cluster_rows = F, 
+  cluster_columns = F,
+  show_column_names = F,
+  rect_gp = gpar(col = "white", lwd = 0.5),
+  right_annotation = ct_colors,
+  top_annotation = ctg_colors,
+  heatmap_legend_param = list(title = "Fold Change in Diapause, adjusted p-val < 0.05", legend_direction = "horizontal"),
+  width = unit(0.2*nrow(merged_FC_sig), "cm"),
+  height = unit(0.5*ncol(merged_FC_sig), "cm"),
+  column_split = c(rep("(1) global",nrow(FC_sig)), rep("(2) ctd",nrow(ctd_FC_sig)))
+)
+
+SaveFigure(hm, type = "png", "merged_global_ctd_peak_heatmap", height = 5, width = 25)
+
+```
 ## Specific Examples
 
 ```{r}
@@ -673,8 +760,8 @@ SaveFigure(p, "ctd_peak_example", width = 6, height = 6)
 
 p <- plot_ctd_peak(
   so,
-  peak = "NC.029663.1-20428362-20429190",
-  ident = "differentiating_neuron", 
+  peak = "NC.029659.1-26106401-26107469",
+  ident = "neuron", 
   tp1 = c("dia6d", "dia1mo"),
   tp2 = c("hb", "dev1d")
 )
