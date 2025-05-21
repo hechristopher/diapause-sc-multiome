@@ -3,18 +3,15 @@ title: "5_monocle"
 ---
 
 ```{r}
+#Load Helper Functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
 suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
   library(SeuratWrappers)
   library(monocle3)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
   library(readxl)
 })
 
-#Load Helper Functions
-source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
 #Set Out Directories
 outs_dir <- "../results_all/"

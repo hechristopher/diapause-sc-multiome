@@ -1,19 +1,16 @@
 
 ## Initialize environment
 ```{r}
+#import helper functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
 suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
   library(SeuratWrappers)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
   library(glmnet)
   library(ComplexHeatmap)
   library(dtwclust)
 })
 
-#import helper functions
-source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
 #set output and figure directories
 outs_dir <- "../results_all/diapause_model/"

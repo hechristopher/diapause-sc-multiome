@@ -3,19 +3,13 @@ title: "3_atac_analyses"
 ---
 
 ```{r}
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
-})
-
 #Load Helper Functions
 source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
+
 #Set Out Directories
 outs_dir <- "../results_all/"
-fig_path <- "../results_all/"
+fig_dir <- "../results_all/figures"
 ```
 
 ## Import annotated seurat object

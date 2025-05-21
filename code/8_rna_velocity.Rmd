@@ -2,18 +2,12 @@
 title: "8_rna_velocity"
 ---
 ```{r}
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
-  library(SeuratWrappers)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
-})
-
-
-
 #import helper functions
 source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
+suppressPackageStartupMessages({
+  library(SeuratWrappers)
+})
 
 #set output and figure directories
 outs_dir <- "../results_all/lineage_subsets/"
