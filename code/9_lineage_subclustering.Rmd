@@ -3,30 +3,27 @@ title: "9_lineage_subclustering"
 ---
 
 ```{r}
+#import helper functions
+source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
+
 suppressPackageStartupMessages({
-  library(Seurat)
-  library(Signac)
+  library(monocle3)
   library(SeuratWrappers)
-  library(BSgenome.Nfurzeri.NCBI.Nfu20140520.custom)
-  library(tidyverse)
 })
 
 
 
-#import helper functions
-source("C:/Users/Christopher He/OneDrive/UCSF/Singh Lab/diapause-sc-multiome/code/helper_functions.R")
 
 #set output and figure directories
-outs_dir <- "../results_all/"
-fig_dir <- "../results_all/"
+outs_dir <- "../results_all/lineage_subsets/"
+fig_dir <- "../results_all/lineage_subsets/"
 ```
 
 ```{r}
-subset_process_RNA_ATAC <- function(so, rna.cts, atac.cts){
-  #subset cells based on rna and atac annotation (intersect)
+subset_process_RNA_ATAC <- function(so, rna.cts){
+  #subset cells based on rna annotation
   rna.cells <- WhichCells(so, expression = annotation_broad %in% rna.cts)
-  atac.cells <- WhichCells(so, expression = annotation_ATAC_broad %in% atac.cts)
-  so_subset <- subset(so, cells = intersect(rna.cells, atac.cells))
+  so_subset <- subset(so, cells = rna.cells)
   
   #process RNA
   DefaultAssay(so_subset) <- "RNA"
@@ -34,18 +31,22 @@ subset_process_RNA_ATAC <- function(so, rna.cts, atac.cts){
   so_subset <- FindVariableFeatures(so_subset)
   so_subset <- ScaleData(so_subset)
   so_subset <- RunPCA(so_subset, verbose = FALSE)
-  so_subset <- RunUMAP(so_subset, dims = 1:30, reduction.name = "umap.rna")
+  so_subset <- FindNeighbors(object = so_subset, dims = 1:30)
+  so_subset <- FindClusters(object = so_subset, resolution = 0.5)
+  so_subset <- RunUMAP(so_subset, dims = 1:30, reduction.name = "umap_RNA")
 
   #process ATAC
   DefaultAssay(so_subset) <- "ATAC"
   so_subset <- RunTFIDF(so_subset)
   so_subset <- FindTopFeatures(so_subset, min.cutoff = 'q0')
   so_subset <- RunSVD(so_subset)
-  so_subset <- RunUMAP(so_subset, reduction = 'lsi', dims = 2:30, reduction.name = "umap.atac") # optional
+  so_subset <- FindNeighbors(object = so_subset, dims = 1:30)
+  so_subset <- FindClusters(object = so_subset, resolution = 0.5)
+  so_subset <- RunUMAP(so_subset, reduction = 'lsi', dims = 2:30, reduction.name = "umap_atac") # optional
   
   #WNN
   so_subset <- FindMultiModalNeighbors(so_subset, reduction.list = list("pca", "lsi"), dims.list = list(1:30, 2:30))
-  so_subset <- RunUMAP(so_subset, nn.name = "weighted.nn", reduction.name = "wnn.umap") # optional
+  so_subset <- RunUMAP(so_subset, nn.name = "weighted.nn", reduction.name = "umap_wnn") # optional
 
   return(so_subset)
 }
@@ -56,160 +57,136 @@ subset_process_RNA_ATAC <- function(so, rna.cts, atac.cts){
 ```{r}
 so <- readRDS("../results_all/so_wnn.rds")
 ```
+
+
 ```{r}
-so_neurons <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "neuron_sema3c", "neuron_dscam", "neuron", 
-    "midbrain_hindbrain", "neuron_progenitor",
-    "differentiating_neuron", "spinal_cord", "neuron_progenitor",
-    "midbrain_hindbrain_pax2/5_en1/2", "midbrain_hindbrain_wnt1/lmx1b",
-    "telencephalon/optic_cup"
-  ),
-  atac.cts = c(
-    "brain", "spinal_cord", "neuron", 
-    "midbrain_hindbrain", "neuron_progenitor",
-    "telencephalon/optic_cup", "floor_plate", "neuron_dscam",
-    "neuron_neurod1"    
-  )
-)
-
-so_epidermal <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "epidermal", "periderm", "otic_vesicle", "otic_vesicle", "primitive_gut", "pronephros"
-  ),
-  atac.cts = c(
-    "epidermal", "periderm", "otic_vesicle", "otic_vesicle", "primitive_gut", "pronephros"
-  )
-)
-
-so_somite <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "myotome/muscle", "somite", "head_kidney", "tail_bud"
-  ),
-  atac.cts = c(
-    "myotome/muscle", "somite", "head_kidney", "tail_bud"
-  )
-)
-
-so_hatch <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "hatching_gland"
-  ),
-  atac.cts = c(
-    "hatching_gland"
-  )
-)
-
-so_endothelial <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "endothelial"
-  ),
-  atac.cts = c(
-    "endothelial"
-  )
-)
-
-so_blood <- subset_process_RNA_ATAC(
-  so,
-  rna.cts = c(
-    "blood"
-  ),
-  atac.cts = c(
-    "blood"
-  )
-)
+table(so$annotation_ATAC_broad)
 ```
 
 ```{r}
-saveRDS(so_neurons, paste0(outs_dir, "lineage_subsets/so_neurons.rds"))
-saveRDS(so_epidermal, paste0(outs_dir, "lineage_subsets/so_epidermal.rds"))
-saveRDS(so_somite, paste0(outs_dir, "lineage_subsets/so_somite.rds"))
-saveRDS(so_hatch, paste0(outs_dir, "lineage_subsets/so_hatch.rds"))
-saveRDS(so_endothelial, paste0(outs_dir, "lineage_subsets/so_endothelial.rds"))
-saveRDS(so_blood, paste0(outs_dir, "lineage_subsets/so_blood.rds"))
+subset_list <- list(
+  "1_neuron" = list("neuron", "neuron_progenitor", "differentiating_neuron"),
+  "2_midbrain_hindbrain_pax_en" = list("midbrain_hindbrain_pax2/5_en1/2"),
+  "3_telencephalon" = list("telencephalon/optic_cup"),
+  "4_epidermal" = list("epidermal"),
+  "5_periderm" = list("periderm"),
+  "6_myotome" = list("myotome/muscle"),
+  "7_somite" = list("somite"),
+  "8_endothelial" = list("endothelial"),
+  "9_blood" = list("blood"),
+  "10_hatching_gland" = list("hatching_gland")
+)
+```
+
+# create, process, save subsets
+```{r}
+#Run as a background job
+for(i in 1:length(subset_list)){
+  name = names(subset_list)[i]
+  rna.cts = subset_list[[i]]
+  so_subset <- subset_process_RNA_ATAC(so, rna.cts)
+  p1 <- DimPlot(so_subset, reduction = "umap.rna", group.by = "timepoint_group", cols = colors_timepoints)
+  p2 <- DimPlot(so_subset, reduction = "umap.rna", group.by = "annotation_broad", cols = colors_broad, label = T)
+  p3 <- DimPlot(so_subset, reduction = "umap.rna", group.by = "RNA_snn_res.0.5", label = T)
+
+  
+  p4 <- DimPlot(so_subset, reduction = "umap.atac", group.by = "timepoint_group", cols = colors_timepoints)
+  p5 <- DimPlot(so_subset, reduction = "umap.atac", group.by = "annotation_broad", cols = colors_broad, label = T)
+  p6 <- DimPlot(so_subset, reduction = "umap.atac", group.by = "ATAC_snn_res.0.5", label = T)
+
+  p7 <- DimPlot(so_subset, reduction = "wnn.umap", group.by = "timepoint_group", cols = colors_timepoints)
+  p8 <- DimPlot(so_subset, reduction = "wnn.umap", group.by = "annotation_broad", cols = colors_broad, label = T)
+  
+  SaveFigure((p1|p2|p3)/(p4|p5|p6)/(p7|p8) & NoLegend() & NoAxes(), paste0(name, "_subset_umaps"), width = 10, height = 10)
+  saveRDS(so_subset, paste0(outs_dir, name, "_so.rds"))
+}
+```
+
+#run monocle
+```{r}
+#function for running monocle
+runMonocle <- function(so){
+  DefaultAssay(so) <- "RNA"
+  cds <- as.cell_data_set(so, default.reduction = "umap.rna")
+  rowData(cds)$gene_short_name <- translate(row.names(rowData(cds)))
+  cds <- preprocess_cds(cds) 
+  cds <- cluster_cells(cds)
+  cds <- learn_graph(cds)
+  cds <- order_cells(cds)
+  return(cds)
+}
 
 ```
 
+#save as adata for input into RNA-velocity and CellRank
 
 ```{r}
-#subset cells annotated as neuronal by both RNA and ATAC
-rna_neurons <- WhichCells(
-  so,
-  expression = annotation_broad %in% c(
-    "neuron_sema3c", "neuron_dscam", "neuron", 
-    "midbrain_hindbrain", "neuron_progenitor",
-    "differentiating_neuron", "spinal_cord", "neuron_progenitor",
-    "midbrain_hindbrain_pax2/5_en1/2", "midbrain_hindbrain_wnt1/lmx1b",
-    "telencephalon/optic_cup"
-  )
-)
-
-atac_neurons <- WhichCells(
-  so,
-  expression = annotation_ATAC_broad %in% c(
-    "brain", "spinal_cord", "neuron", 
-    "midbrain_hindbrain", "neuron_progenitor",
-    "telencephalon/optic_cup", "floor_plate", "neuron_dscam",
-    "neuron_neurod1"
-  )
-)
-
-so_neurons <- subset(
-  so,
-  cells = intersect(rna_neurons, atac_neurons)
-)
-
+i = 9
+for(i in 1:length(subset_list)){
+  name = names(subset_list)[i]
+  so <- readRDS(paste0(outs_dir, name, "_so.rds"))
+  
+  #save umap coordinates to metadata
+  so$umap.rna_1 <- so@reductions$umap.rna@cell.embeddings[,1]
+  so$umap.rna_2 <- so@reductions$umap.rna@cell.embeddings[,2]
+  so$umap.atac_1 <- so@reductions$umap.atac@cell.embeddings[,1]
+  so$umap.atac_2 <- so@reductions$umap.atac@cell.embeddings[,2]
+  so$umap.wnn_1 <- so@reductions$wnn.umap@cell.embeddings[,1]
+  so$umap.wnn_2 <- so@reductions$wnn.umap@cell.embeddings[,2]
+  
+  # write metadata to csv
+  so$barcode <- colnames(so)
+  write.csv(so@meta.data, file=paste0(outs_dir, name, '_metadata.csv'), quote=F, row.names=F)
+  
+  # write pca matrix to csv
+  write.csv(so@reductions$pca@cell.embeddings, file=paste0(outs_dir, name, '_pca.csv'), quote=F, row.names=F)
+  
+  # extract neighborhood graph
+  nn_idx <- so@neighbors$weighted.nn@nn.idx
+  nn_dist <- so@neighbors$weighted.nn@nn.dist
+  nn_cells <- so@neighbors$weighted.nn@cell.names
+  
+  # save neighborhood graph
+  write.table(nn_idx, paste0(outs_dir, name, "_nn_idx.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+  write.table(nn_dist, paste0(outs_dir, name, "_nn_dist.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+  write.table(nn_cells, paste0(outs_dir, name, "_nn_cells.txt"), sep = ',', row.names = F, col.names = F, quote = F)
+}
 ```
 
 ```{r}
-# preprocess RNA
-DefaultAssay(so_neurons) <- "RNA"
-
-so_neurons <- NormalizeData(so_neurons)
-so_neurons <- FindVariableFeatures(so_neurons)
-so_neurons <- ScaleData(so_neurons)
-so_neurons <- RunPCA(so_neurons, verbose = FALSE)
-so_neurons <- RunUMAP(so_neurons, dims = 1:30, reduction.name = "umap.rna") # optional
+so_blood <- so
 ```
 
 
 ```{r}
-# preprocess ATAC
-DefaultAssay(so_neurons) <- "ATAC"
-so_neurons <- RunTFIDF(so_neurons)
-so_neurons <- FindTopFeatures(so_neurons, min.cutoff = 'q0')
-so_neurons <- RunSVD(so_neurons)
-so_neurons <- RunUMAP(so_neurons, reduction = 'lsi', dims = 2:30, reduction.name = "umap.atac") # optional
+# renv::install("zqfang/MuDataSeurat", force = T)
+DefaultAssay(so_blood) <- "RNA"
+so_blood_diet = DietSeurat(
+  so_blood,
+  layers = c("counts", "data"),
+  features = rownames(so_blood), # export all genes, not just top highly variable genes
+  assays = "RNA",
+  dimreducs = c("pca","umap.rna"),
+  graphs = c("RNA_nn", "RNA_snn"), # to RNA_nn -> distances, RNA_snn -> connectivities
+  misc = TRUE
+)
+so_blood_diet <- JoinLayers(so_blood_diet)
+MuDataSeurat::WriteH5AD(so_blood_diet, paste0(outs_dir, "so_blood.h5ad"), assay="RNA")
 ```
-
 ```{r}
-DimPlot(so_neurons, reduction = "umap.rna", group.by = "timepoint_group", cols = colors_timepoints)
-DimPlot(so_neurons, reduction = "umap.rna", group.by = "annotation_broad", cols = colors_broad, label = T)
+counts <- GetAssayData(so_blood, slot = "counts")
+writeMM(counts, file = paste0(outs_dir, name, "_counts.mtx"))
+write.csv(rownames(counts), paste0(outs_dir, name, "_genes.csv"), row.names = FALSE)
+write.csv(colnames(counts), paste0(outs_dir, name, "_barcodes.csv"), row.names = FALSE)
 
-DimPlot(so_neurons, reduction = "umap.atac", group.by = "timepoint_group", cols = colors_timepoints)
-DimPlot(so_neurons, reduction = "umap.atac", group.by = "annotation_broad", cols = colors_broad, label = T)
+# 2. Save metadata
+metadata <- so_blood@meta.data
+write.csv(metadata, paste0(outs_dir, name, "_metadata.csv"))
 
-```
-
-```{r}
-# find weighted nearest neighbors
-so_neurons <- FindMultiModalNeighbors(so_neurons, reduction.list = list("pca", "lsi"), dims.list = list(1:30, 2:30))
-so_neurons <- RunUMAP(so_neurons, nn.name = "weighted.nn", reduction.name = "wnn.umap") # optional
-```
-
-```{r}
-
-DimPlot(so_neurons, reduction = "wnn.umap", group.by = "annotation_ATAC_broad", cols = colors_broad, label = T)
-
-```
-
-
-```{r}
-saveRDS(so_neurons, paste0(outs_dir, "so_neurons.rds"))
+# 3. Save dimensionality reductions (e.g., PCA and UMAP)
+# PCA
+write.csv(Embeddings(so_blood[["pca"]]), file = paste0(outs_dir, name, "_pca.csv"))
+# UMAP
+write.csv(Embeddings(so_blood[["umap.rna"]]), file = paste0(outs_dir, name, "_umap.csv"))
 ```
 

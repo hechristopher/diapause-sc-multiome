@@ -916,10 +916,11 @@ go_genes <- run_killifish_go(
 
 ```{r}
 
-#go_plot <- go %>% top_n(-10, padj) %>% arrange(desc(Count))
-go_plot <- go[c("1","2","3","4","5","11","39","47","122","169","170"),] %>% arrange(desc(Count))
+#filter top ten genes
+go_plot <- go %>% top_n(-10, padj) %>% arrange(desc(Count))
+#factor Term column so that plot is in correct order
 go_plot$Term <- factor(go_plot$Term, levels = rev(go_plot$Term))
-
+#plot go terms
 ggplot(data=go_plot)+
   geom_bar(aes(x=Term, y=Count, fill=padj), stat='identity')+
   coord_flip() + scale_fill_gradient(low="red", high = "blue", limits = c(0, 0.05))+ 
@@ -1022,6 +1023,63 @@ DefaultAssay(so) <- "RNA"
 FeaturePlot(so, features = c("elavl3"), reduction = "umap") + NoAxes()
 FeaturePlot(so, features = c("LOC107374948"), reduction = "umap") + NoAxes()
 FeaturePlot(so, features = c("epcam"), reduction = "umap") + NoAxes()
+
+```
+## GO for Rui
+```{r}
+predia_23vs30 <- read.csv(paste0(outs_dir, "rui_predia_23Cvs30C_upregulated.csv"))
+hb_23vs30 <- read.csv(paste0(outs_dir, "rui_hb_23Cvs30C_upregulated.csv"))
+
+master_genes <- read.csv("../results_all/master_genes_global_and_celltype.csv", row.names = 1)
+```
+
+```{r}
+predia_genes <- predia_23vs30 %>% filter(p_val_adj < 0.05 & logFC > 2)
+
+go <- run_killifish_go(predia_genes$Gene, rownames(master_genes))
+
+go
+```
+```{r}
+hb_genes <- hb_23vs30 %>% filter(p_val_adj < 0.05 & logFC > 2)
+
+go_hb <- run_killifish_go(hb_genes$Gene, rownames(master_genes))
+
+go_hb$genes <- sapply(go_hb$genes, function(x) paste(x, collapse = ", "))
+
+
+write.csv(go_hb, paste0(outs_dir, "rui_hb_23vs30_go_results.csv"))
+```
+
+```{r}
+hb_genes <- hb_23vs30 %>% filter(p_val_adj < 0.05 & logFC < -2)
+
+go_hb <- run_killifish_go(hb_genes$Gene, rownames(master_genes))
+
+go_hb$genes <- sapply(go_hb$genes, function(x) paste(x, collapse = ", "))
+
+
+write.csv(go_hb, paste0(outs_dir, "rui_hb_30C_up_go_results.csv"))
+```
+
+
+#ntng1
+```{r}
+DefaultAssay(so) <- "RNA"
+FeaturePlot(so_blood, features = "cirbp", reduction = "umap.rna")
+```
+```{r}
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+
+```
+```{r}
+s.genes <- translate(s.genes, from = "Human", to = "N. furzeri (NCBI)")
+g2m.genes <- translate(g2m.genes, from = "Human", to = "N. furzeri (NCBI)")
+
+writeLines(s.genes, paste0(outs_dir, "s.genes.txt"))
+writeLines(g2m.genes, paste0(outs_dir, "g2m.genes.txt"))
 
 ```
 
