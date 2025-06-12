@@ -1079,6 +1079,70 @@
       "Maintainer": "Kirill Müller <kirill@cynkra.com>",
       "Repository": "CRAN"
     },
+    "DESeq2": {
+      "Package": "DESeq2",
+      "Version": "1.46.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Differential gene expression analysis based on the negative binomial distribution",
+      "Authors@R": "c( person(\"Michael\", \"Love\", email=\"michaelisaiahlove@gmail.com\", role = c(\"aut\",\"cre\")), person(\"Constantin\", \"Ahlmann-Eltze\", role = c(\"ctb\")), person(\"Kwame\", \"Forbes\", role = c(\"ctb\")), person(\"Simon\", \"Anders\", role = c(\"aut\",\"ctb\")), person(\"Wolfgang\", \"Huber\", role = c(\"aut\",\"ctb\")), person(\"RADIANT EU FP7\", role=\"fnd\"), person(\"NIH NHGRI\", role=\"fnd\"), person(\"CZI\", role=\"fnd\"))",
+      "Maintainer": "Michael Love <michaelisaiahlove@gmail.com>",
+      "Description": "Estimate variance-mean dependence in count data from high-throughput sequencing assays and test for differential expression based on a model using the negative binomial distribution.",
+      "License": "LGPL (>= 3)",
+      "VignetteBuilder": "knitr, rmarkdown",
+      "Imports": [
+        "BiocGenerics (>= 0.7.5)",
+        "Biobase",
+        "BiocParallel",
+        "matrixStats",
+        "methods",
+        "stats4",
+        "locfit",
+        "ggplot2 (>= 3.4.0)",
+        "Rcpp (>= 0.11.0)",
+        "MatrixGenerics"
+      ],
+      "Depends": [
+        "S4Vectors (>= 0.23.18)",
+        "IRanges",
+        "GenomicRanges",
+        "SummarizedExperiment (>= 1.1.6)"
+      ],
+      "Suggests": [
+        "testthat",
+        "knitr",
+        "rmarkdown",
+        "vsn",
+        "pheatmap",
+        "RColorBrewer",
+        "apeglm",
+        "ashr",
+        "tximport",
+        "tximeta",
+        "tximportData",
+        "readr",
+        "pbapply",
+        "airway",
+        "pasilla (>= 0.2.10)",
+        "glmGamPoi",
+        "BiocManager"
+      ],
+      "LinkingTo": [
+        "Rcpp",
+        "RcppArmadillo"
+      ],
+      "URL": "https://github.com/thelovelab/DESeq2",
+      "biocViews": "Sequencing, RNASeq, ChIPSeq, GeneExpression, Transcription, Normalization, DifferentialExpression, Bayesian, Regression, PrincipalComponent, Clustering, ImmunoOncology",
+      "RoxygenNote": "7.3.1",
+      "Encoding": "UTF-8",
+      "git_url": "https://git.bioconductor.org/packages/DESeq2",
+      "git_branch": "RELEASE_3_20",
+      "git_last_commit": "4887eb4",
+      "git_last_commit_date": "2024-10-29",
+      "Repository": "Bioconductor 3.20",
+      "NeedsCompilation": "yes",
+      "Author": "Michael Love [aut, cre], Constantin Ahlmann-Eltze [ctb], Kwame Forbes [ctb], Simon Anders [aut, ctb], Wolfgang Huber [aut, ctb], RADIANT EU FP7 [fnd], NIH NHGRI [fnd], CZI [fnd]"
+    },
     "DelayedArray": {
       "Package": "DelayedArray",
       "Version": "0.32.0",
@@ -2205,6 +2269,42 @@
       "BugReports": "https://R-forge.R-project.org/tracker/?func=add&atid=294&group_id=61",
       "NeedsCompilation": "no",
       "Repository": "CRAN"
+    },
+    "MuDataSeurat": {
+      "Package": "MuDataSeurat",
+      "Version": "0.0.1.0000",
+      "Source": "GitHub",
+      "Title": "MuData Serialization for Seurat",
+      "Authors@R": "c(person(given = \"Danila\", family = \"Bredikhin\", role = c(\"aut\", \"cre\"), email = \"danila.bredikhin@embl.de\", comment = c(ORCID = \"0000-0001-8089-6983\")), person(given = \"Ilia\", family = \"Kats\", role = c(\"aut\"), email = \"i.kats@dkfz-heidelberg.de\", comment = c(ORCID = \"0000-0001-5220-5671\")), person(given = \"Zhuoqing\", family = \"Fang\", role = c(\"aut\"), email = \"zqfang1@outlook.com\", comment = c(ORCID = \"0000-0002-7418-1313\")))",
+      "Description": "Save Seurat objects to h5mu files. The suggested SeuratData package is availabe on GitHub at <https://github.com/satijalab/seurat-data> and can be installed with devtools.",
+      "Imports": [
+        "hdf5r",
+        "Matrix",
+        "Seurat",
+        "methods",
+        "utils"
+      ],
+      "Suggests": [
+        "rmarkdown",
+        "knitr",
+        "SeuratData",
+        "BiocStyle"
+      ],
+      "Config/Needs/website": "r-lib/downlit",
+      "VignetteBuilder": "knitr",
+      "License": "GPL-3",
+      "Encoding": "UTF-8",
+      "LazyData": "true",
+      "RoxygenNote": "7.1.2",
+      "Author": "Danila Bredikhin [aut, cre] (<https://orcid.org/0000-0001-8089-6983>), Ilia Kats [aut] (<https://orcid.org/0000-0001-5220-5671>), Zhuoqing Fang [aut] (<https://orcid.org/0000-0002-7418-1313>)",
+      "Maintainer": "Danila Bredikhin <danila.bredikhin@embl.de>",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "zqfang",
+      "RemoteRepo": "MuDataSeurat",
+      "RemoteRef": "main",
+      "RemoteSha": "8080f8a410ce8b0e2a6071954dcbcb4286643e5d",
+      "Remotes": "SeuratData=satijalab/seurat-data"
     },
     "PANTHER.db": {
       "Package": "PANTHER.db",
