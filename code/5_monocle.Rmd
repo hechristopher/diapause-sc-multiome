@@ -506,3 +506,116 @@ p <- plot_genes_in_pseudotime(cds[c("rbm5", "LOC107392522", "LOC107373896","arrd
 
 SaveFigure(p, "monocle/neuron_pseudotime_genes", width = 5, height =5)
 ```
+
+
+#Monocle for ATAC-seq
+```{r}
+so_neuron <- readRDS("../results_all/lineage_subsets/1_neuron_so.rds")
+
+so_neuron <- so_neuron[,  so_neuron$annotation_ATAC_broad %in% c("brain", "spinal_cord", "neuron", "midbrain_hindbrain", "neuron_progenitor", "telencephalon/optic_cup", "neuron_dscam", "neuron_neurod1")]
+
+DimPlot(so_neuron, reduction = "umap.atac", group.by = "annotation_ATAC_broad", label = T)
+DimPlot(so_neuron, reduction = "umap.atac", group.by = "timepoint_group", label = T)
+
+```
+## create cds
+```{r}
+DefaultAssay(so_neuron) <- "ATAC"
+so_neuron@reductions$umap <- so_neuron@reductions$umap.atac
+
+neuron.cds <- as.cell_data_set(so_neuron, default.reduction = "umap.atac")
+```
+
+## run monocle
+```{r}
+rowData(neuron.cds)$gene_short_name <- row.names(rowData(neuron.cds))
+neuron.cds <- preprocess_cds(neuron.cds) 
+neuron.cds <- cluster_cells(neuron.cds)
+neuron.cds <- learn_graph(neuron.cds)
+neuron.cds <- order_cells(neuron.cds)
+
+
+plot_cells(neuron.cds,
+           color_cells_by = "timepoint_group",
+           label_groups_by_cluster=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE)
+
+plot_cells(neuron.cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5)
+
+```
+
+## module genes
+```{r}
+neuron_diapause_genes <- graph_test(neuron.cds, neighbor_graph="principal_graph")
+top_neuron_diapause_genes <- (neuron_diapause_genes %>% arrange(q_value) %>% top_n(-50, q_value))$gene_short_name
+
+```
+## create cds
+```{r}
+so_blood <- readRDS("../results_all/lineage_subsets/9_blood_so.rds")
+
+so_blood <- so_blood[,  so_blood$annotation_ATAC_broad %in% c("blood")]
+
+DimPlot(so_blood, reduction = "umap.atac", group.by = "annotation_ATAC_broad", label = T)
+DimPlot(so_blood, reduction = "umap.atac", group.by = "timepoint_group", label = T)
+
+DefaultAssay(so_blood) <- "ATAC"
+so_blood@reductions$umap <- so_blood@reductions$umap.atac
+
+blood.cds <- as.cell_data_set(so_blood, default.reduction = "umap.atac")
+```
+
+## run monocle
+```{r}
+rowData(blood.cds)$gene_short_name <- row.names(rowData(blood.cds))
+blood.cds <- preprocess_cds(blood.cds) 
+blood.cds <- cluster_cells(blood.cds)
+blood.cds <- learn_graph(blood.cds)
+blood.cds <- order_cells(blood.cds)
+
+
+plot_cells(blood.cds,
+           color_cells_by = "timepoint_group",
+           label_groups_by_cluster=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE)
+
+plot_cells(blood.cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5, 
+           cell_size = 1)
+
+```
+
+## module genes
+```{r}
+blood_diapause_genes <- graph_test(blood.cds, neighbor_graph="principal_graph")
+top_blood_diapause_genes <- (blood_diapause_genes %>% arrange(q_value) %>% top_n(-50, q_value))$gene_short_name
+
+```
+```{r}
+module_genes <- row.names(blood_diapause_genes %>% filter(q_value < 0.05))
+
+blood_modules <- find_gene_modules(blood.cds[module_genes,], resolution=0.001)
+
+
+# agg_mat <- aggregate_gene_expression(cds, neuron_modules)
+# module_dendro <- hclust(dist(agg_mat))
+# neuron_modules$module <- factor(neuron_modules$module, 
+#                                 levels = row.names(agg_mat)[module_dendro$order])
+
+plot_cells(blood.cds,
+           genes=blood_modules,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
