@@ -908,6 +908,8 @@ master_peaks <- master_peaks[,-1]
 find cell type specific motifs
 
 ```{r}
+DefaultAssay(so) <- "ATAC"
+
 dia_pct_thresh <- 0.01
 p_val_adj_thresh <- 0.05
 fc_thresh <- 0.5
@@ -931,7 +933,8 @@ for(celltype in celltypes[2:length(celltypes)]){
     features = rownames(peaks)
   )
   
-  motifs <- enriched.motifs %>% filter(p.adjust < 0.05) %>% select(fold.enrichment, p.adjust, motif.name, motif)
+  motifs <- enriched.motifs  %>% select(fold.enrichment, p.adjust, motif.name, motif)
+  #%>% filter(p.adjust < 0.05)
   
   if(nrow(motifs) > 0){
     motifs$celltype <- celltype

@@ -822,7 +822,6 @@ master_peaks <- read.csv("../results_all/master_peaks_global_and_celltype.csv")
 ```
 
 
-# coverage plots for diapause genes
 
 ```{r}
 so <- readRDS("../results_all/so_wnn.rds")
@@ -836,6 +835,12 @@ so <- readRDS("../results_all/so_wnn.rds")
 # 
 # saveRDS(so, "../results_all/so_wnn.rds")
 ```
+# coverage plots for diapause genes
+
+```{r}
+so <- readRDS("../results_all/so_wnn.rds")
+```
+
 
 ```{r}
 all_links <- as.data.frame(Links(so))
@@ -1082,4 +1087,38 @@ writeLines(s.genes, paste0(outs_dir, "s.genes.txt"))
 writeLines(g2m.genes, paste0(outs_dir, "g2m.genes.txt"))
 
 ```
+```{r}
+DefaultAssay(so) <- "RNA"
+VlnPlot(so, features = c("jade2", "LOC107392522", "rbm5", "LOC107373896"), group.by = "diadev", pt.size = 0,
+        cols = c("#FD8D3C", "#6BAED6"), ncol = 4)
+
+FeaturePlot(so, features = "elavl3", reduction = "umap") + NoAxes() + NoLegend()
+```
+
+#Translate TFs from utoronto
+```{r}
+hum_tfs <- read.table("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\Genome Resources\\utoronto_human_TFs.txt")
+
+nfur_tfs <- translate(hum_tfs$V1, from = "Human", multiple = "all", unlist_result = T)
+
+writeLines(nfur_tfs, "C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\Genome Resources\\nfur_utoronto_translated_TFs.txt")
+```
+
+```{r}
+```
+
+
+```{r}
+DefaultAssay(so) <- "RNA"
+p <- FeaturePlot(so, reduction = "umap", features = c("LOC107387288", "LOC107376365")) + 
+SaveFigure(p, path = "mapt_ctsd", type = "png", width = 8, height = 4)
+```
+```{r}
+#so_neu <- readRDS("../results_all/lineage_subsets_old/so_neurons.rds")
+DefaultAssay(so_neu) <- "RNA"
+p <- FeaturePlot(so_neu, reduction = "umap.rna", features = c("LOC107387288", "LOC107376365"))
+SaveFigure(p, path = "mapt_ctsd_neurononly", type = "png", width = 8, height = 4)
+
+```
+
 

@@ -15,7 +15,7 @@ fig_dir <- "../results_all/figures"
 ## Import annotated seurat object
 
 ```{r}
-so_annotated <- readRDS(paste0(outs_dir, "/so_annotated.rds"))
+so_annotated <- readRDS(paste0(outs_dir, "so_annotated.rds"))
 ```
 
 ## Seurat Processing

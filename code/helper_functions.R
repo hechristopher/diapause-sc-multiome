@@ -11,17 +11,38 @@ suppressPackageStartupMessages({
 
 # translate gene orthologs between species
 # acceptable column names: "N. furzeri (NCBI)", "N. furzeri Final Symbol", "
-translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol") {
+translate <- function(genes, from = "N. furzeri (NCBI)", to = "N. furzeri Final Symbol", 
+                      multiple = c("first", "all"), unlist_result = FALSE) {
+  multiple <- match.arg(multiple)  # validate 'multiple' argument
+  
   orthos <- readxl::read_excel("C:\\Users\\Christopher He\\OneDrive\\UCSF\\Singh Lab\\gene_ortholog_translation_data.xlsx")
   
-  orthos <- orthos[!duplicated(orthos[[from]]),]
-  orthos <- orthos[!is.na(orthos[[from]]),]
+  # Remove NA from 'from' column
+  orthos <- orthos[!is.na(orthos[[from]]), ]
   
-  row.names(orthos) <- orthos[[from]]
-  translated <- orthos[genes,]
-  translated$genes <- genes
-  translated <- translated %>% mutate({{ to }} := coalesce(.data[[to]], genes))
-  return(translated[[to]])
+  if (multiple == "first") {
+    # Keep only first match per 'from'
+    orthos_unique <- orthos[!duplicated(orthos[[from]]), ]
+    row.names(orthos_unique) <- orthos_unique[[from]]
+    translated <- orthos_unique[genes, ]
+    result <- translated[[to]]
+    return(result)
+  }
+  
+  if (multiple == "all") {
+    # Return all matches per input gene
+    result <- lapply(genes, function(g) {
+      matches <- orthos[orthos[[from]] == g, to]
+      if (length(matches) == 0) NA else matches
+    })
+    names(result) <- genes
+    
+    if (unlist_result) {
+      return(unlist(result, use.names = FALSE))  # flat unnamed vector
+    } else {
+      return(result)  # named list
+    }
+  }
 }
 # save figure
 SaveFigure <- function(plots, path, type = "png", width, height, res){
