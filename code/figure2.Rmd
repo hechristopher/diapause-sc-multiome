@@ -21,6 +21,85 @@ fig_dir <- "../manuscript/figure2/"
 so <- readRDS("../results_all/so_wnn.rds")
 ```
 
+# heatmap function
+```{r}
+generate_fc_matrix <- function(gene_list, data_frame, celltypes, pval_cutoff = 0.05, sort = F) {
+  # Ensure gene_list is a character vector
+  gene_list <- unlist(gene_list)
+  
+  
+  # Step 1: Identify avg_log2FC and p_val_adj columns
+  fc_cols <- sapply(celltypes, function(x) paste0("avg_log2FC_", x))
+  pval_cols <- sapply(celltypes, function(x) paste0("p_val_adj_", x))
+  
+  # Sanity check
+  if (length(fc_cols) == 0 || length(pval_cols) == 0) {
+    stop("Required columns (avg_log2FC_*, p_val_adj_*) not found in the data frame.")
+  }
+  
+  # Ensure same number of cell types in FC and pval columns
+  if (length(fc_cols) != length(pval_cols)) {
+    stop("Mismatch between number of FC and p-value columns.")
+  }
+  
+  # Subset FC and p-value matrices
+  fc_mat <- data_frame[gene_list, fc_cols, drop = FALSE]
+  pval_mat <- data_frame[gene_list, pval_cols, drop = FALSE]
+  
+  # Match cell type names
+  celltypes_fc <- gsub("^avg_log2FC_", "", fc_cols)
+  celltypes_pv <- gsub("^p_val_adj_", "", pval_cols)
+  
+  if (!all(celltypes_fc == celltypes_pv)) {
+    stop("Mismatch between FC and p-value column cell type names.")
+  }
+  
+  rownames(fc_mat) <- gene_list
+  rownames(pval_mat) <- gene_list
+  colnames(fc_mat) <- celltypes_fc
+  colnames(pval_mat) <- celltypes_pv
+
+  # Zero out FC values where p > 0.05
+  fc_mat[pval_mat > pval_cutoff] <- NA
+  
+  # Transpose: rows = cell types, columns = genes
+  fc_mat_t <- t(as.matrix(fc_mat))
+  
+  if(sort == T){
+      max_celltype_per_gene <- apply(fc_mat_t, 2, function(x) which.max(x))
+    celltype_names <- rownames(fc_mat_t)
+    max_celltype_labels <- celltype_names[max_celltype_per_gene]
+  
+    # Step 3: Create a data frame to hold gene info for sorting
+    gene_df <- data.frame(
+      Gene = colnames(fc_mat_t),
+      MaxCellType = max_celltype_labels,
+      FC_in_MaxCellType = mapply(function(g, ct) fc_mat_t[ct, g], 
+                                 colnames(fc_mat_t), max_celltype_per_gene),
+      stringsAsFactors = FALSE
+    )
+    
+    # Step 4: Sort by MaxCellType (desired order) and descending FC within
+    # Define desired order of cell types
+    desired_order <- rownames(fc_mat_t)  # e.g., c("CellType1", "CellType2", ...)
+    gene_df$MaxCellType <- factor(gene_df$MaxCellType, levels = desired_order)
+    
+    gene_df_sorted <- gene_df[order(gene_df$MaxCellType, -gene_df$FC_in_MaxCellType), ]
+    
+    # Step 5: Reorder columns of fc_matrix
+    fc_matrix_sorted <- fc_mat_t[, gene_df_sorted$Gene]
+    
+    # View sorted matrix
+    fc_matrix_sorted
+    
+    return(fc_matrix_sorted)
+  }
+  else{
+    return(fc_mat_t)
+  }
+}
+```
+
 # Global and Cell Type Genes 
 ```{r}
 # read in master sheets
@@ -61,6 +140,8 @@ rank_thresh <- 3
 master_genes$rank <- rowSums(ifelse(master_genes %>% select(contains("p_val_adj")) < p_val_adj_thresh, 1, 0) == 1)
 
 ctd_genes <- data.frame(avg_log2FC = numeric(), gene = character(), celltype = character())
+
+celltype = celltypes[2]
 for(celltype in celltypes[2:length(celltypes)]){
   genes <- master_genes %>% filter(
     .data[[paste0("pct.1_", celltype)]] > dia_pct_thresh &
@@ -99,7 +180,7 @@ merged_FC_sig <- as.matrix(bind_rows(as.data.frame(global_sig), as.data.frame(ct
 ct_colors = rowAnnotation(ct = colnames(merged_FC_sig), col = list(ct = celltype_cols), show_legend=F, show_annotation_name=F)
 ctg_colors = HeatmapAnnotation(
   ctg = c(rep("global", nrow(global_sig)), ctd_genes$celltype),
-  col = list(ctg = c(column_cols, "global" = "#2171B5")),
+  col = list(ctg = c(celltype_cols, "global" = "#2171B5")),
   show_legend = F, show_annotation_name = F, simple_anno_size = unit(0.3, "cm"))
 
 
@@ -122,6 +203,101 @@ hm <- Heatmap(
 SaveFigure(hm, type = "png", "merged_global_ctd_gene_heatmap", height = 5, width = 20)
 
 ```
+
+##full barplot
+```{r}
+df_bar <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
+
+
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 1
+
+# Initialize a matrix to store logical values (genes x celltypes)
+signif_matrix <- sapply(celltypes, function(ct) {
+  pct_col <- paste0("pct.1_", ct)
+  logfc_col <- paste0("avg_log2FC_", ct)
+  pval_col <- paste0("p_val_adj_", ct)
+
+  (df_bar[[pct_col]] >= dia_pct_thresh) & 
+  (df_bar[[logfc_col]] >= fc_thresh) & 
+  (df_bar[[pval_col]] <= p_val_adj_thresh)
+})
+
+# In case only one celltype, convert to matrix
+signif_matrix <- as.matrix(signif_matrix)
+
+# Add "rank" column
+df_bar$rank <- rowSums(signif_matrix)
+
+ggplot(df_bar %>% filter(rank != 0), aes(x = rank)) +
+  geom_bar(fill = "orange") +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_continuous(breaks = c(1:14))
+
+```
+
+```{r}
+fc <- generate_fc_matrix(gene_list = rownames(df_bar %>% filter(rank == 1)), celltypes = celltypes, data_frame = master_genes, sort = T)
+
+fc2 <- generate_fc_matrix(gene_list = ctd_genes$gene, celltypes = celltypes, data_frame = master_genes, sort = T)
+
+fc3 <- generate_fc_matrix(gene_list = rownames(global_genes), celltypes = celltypes, data_frame = master_genes)
+
+fc_whole <- generate_fc_matrix(gene_list = rownames(master_genes), celltypes = celltypes, data_frame = master_genes)
+Heatmap(
+  fc_whole,
+  cluster_rows = F, 
+  cluster_columns = F,
+  na_col = "grey90",
+  col = colorRamp2(breaks = c(-5,0,0.1,5,7), colors = c("blue","white", "pink", "red", "red"))
+)
+```
+
+```{r}
+df_bar <- read.csv(paste0(outs_dir, "master_genes_global_and_celltype.csv"), row.names = 1)
+
+
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 2
+
+# Initialize a matrix to store logical values (genes x celltypes)
+signif_matrix <- sapply(celltypes, function(ct) {
+  pct_col <- paste0("pct.1_", ct)
+  logfc_col <- paste0("avg_log2FC_", ct)
+  pval_col <- paste0("p_val_adj_", ct)
+
+  (df_bar[[pval_col]] <= p_val_adj_thresh)
+})
+
+# In case only one celltype, convert to matrix
+signif_matrix <- as.matrix(signif_matrix)
+
+# Add "rank" column
+df_bar$rank <- rowSums(signif_matrix)
+
+df_bar_global <- df_bar %>% filter(pct.1_global > 0.01, p_val_adj_global < 0.05, rank >= 9)
+
+fc_counts <- tibble(
+  threshold = c("FC>0", "FC>1", "FC>2"),
+  count = c(
+    sum(df_bar_global$avg_log2FC_global > 0),
+    sum(df_bar_global$avg_log2FC_global > 1),
+    sum(df_bar_global$avg_log2FC_global > 2)
+  )
+)
+
+ggplot(fc_counts, aes(x = threshold, y = count, fill = threshold)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  geom_text(aes(label = count), vjust = -0.5, size = 5) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
 
 # Global and Cell Type Peaks 
 ```{r}
@@ -224,6 +400,84 @@ hm <- Heatmap(
 SaveFigure(hm, type = "png", "merged_global_ctd_peak_heatmap", height = 5, width = 40)
 
 ```
+
+##full barplot
+```{r}
+df_bar_peaks <- read.csv(paste0(outs_dir, "master_peaks_global_and_celltype.csv"), row.names = 1)
+
+
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 0
+# Initialize a matrix to store logical values (genes x celltypes)
+signif_matrix <- sapply(celltypes, function(ct) {
+  pct_col <- paste0("pct.1_", ct)
+  logfc_col <- paste0("avg_log2FC_", ct)
+  pval_col <- paste0("p_val_adj_", ct)
+
+  (df_bar_peaks[[pct_col]] >= dia_pct_thresh) & 
+  (df_bar_peaks[[logfc_col]] >= fc_thresh) & 
+  (df_bar_peaks[[pval_col]] <= p_val_adj_thresh)
+})
+
+# In case only one celltype, convert to matrix
+signif_matrix <- as.matrix(signif_matrix)
+
+# Add "rank" column
+df_bar_peaks$rank <- rowSums(signif_matrix)
+
+ggplot(df_bar_peaks %>% filter(rank != 0), aes(x = rank)) +
+  geom_bar(fill = "orange") +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_continuous(breaks = c(1:14))
+
+```
+
+```{r}
+df_bar_peaks <- read.csv(paste0(outs_dir, "master_peaks_global_and_celltype.csv"), row.names = 1)
+
+
+dia_pct_thresh <- 0.1
+p_val_adj_thresh <- 0.05
+fc_thresh <- 2
+
+# Initialize a matrix to store logical values (genes x celltypes)
+signif_matrix <- sapply(celltypes, function(ct) {
+  pct_col <- paste0("pct.1_", ct)
+  logfc_col <- paste0("avg_log2FC_", ct)
+  pval_col <- paste0("p_val_adj_", ct)
+
+  (df_bar_peaks[[pval_col]] <= p_val_adj_thresh)
+})
+
+# In case only one celltype, convert to matrix
+signif_matrix <- as.matrix(signif_matrix)
+
+# Add "rank" column
+df_bar_peaks$rank <- rowSums(signif_matrix)
+
+df_bar_peaks_global <- df_bar_peaks %>% filter(pct.1_global > 0.01, p_val_adj_global < 0.05, rank >= 9)
+
+fc_counts <- tibble(
+  threshold = c("FC>0", "FC>1", "FC>2"),
+  count = c(
+    sum(df_bar_peaks_global$avg_log2FC_global > 0),
+    sum(df_bar_peaks_global$avg_log2FC_global > 1),
+    sum(df_bar_peaks_global$avg_log2FC_global > 2)
+  )
+)
+
+ggplot(fc_counts, aes(x = threshold, y = count, fill = threshold)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  geom_text(aes(label = count), vjust = -0.5, size = 5) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+
 # Global and Cell Type Motifs
 ```{r}
 master_motifs_ct <- read.csv(paste0(outs_dir, "master_motifs_global_and_celltype.csv"))
@@ -328,15 +582,28 @@ p2
 ```
 ##All genes
 ```{r}
+DefaultAssay(so) <- "RNA"
 so$rna.splits <- ifelse(so$timepoint %in% c("hb", "dev1d"), "dev", 
                                                ifelse(so$timepoint %in% c("dia6d", "dia1mo"), "dia", NA))
 so_rna <- subset(so, subset = rna.splits %in% c("dev", "dia"))
+
+```
+```{r}
+#jade2
+DefaultAssay(so_rna) <- "RNA"
+
+Idents(so_rna) <- "annotation_broad"
+p <- VlnPlot(so_rna, "jade2", group.by = "annotation_broad", split.by = "rna.splits", idents = gsub("\\.", "/",celltypes), cols =c("#FD8D3C", "#6BAED6"), pt.size = 0, y.max = 6)
+
+SaveFigure(p, "jade2", type = "pdf", width = 8, height = 5, res = 300)
+
+
 ```
 
 
 ```{r}
-DefaultAssay(so) <- "RNA"
-
+DefaultAssay(so_rna) <- "RNA"
+i = 53
 for(i in 1:nrow(ctd_genes)){
   row = ctd_genes[i,]
   Idents(so_rna) <- "annotation_broad"
@@ -347,13 +614,40 @@ for(i in 1:nrow(ctd_genes)){
     split.by = "rna.splits",
     idents = gsub("\\.", "/",celltypes),
     cols =c("#FD8D3C", "#6BAED6"),
-    pt.size = 0
+    pt.size = 0,
+    y.max = 5.1
   )
   p1 <- p + geom_jitter(mapping = aes(color = split), data = p$data,
                         position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.9), size = 0.5, alpha = 0.2) +
     scale_color_manual(breaks = c("dev", "dia"), values = c("#FD8D3C", "#6BAED6"))
 
-  SaveFigure(p1, paste0("ctd_genes/", i, "_", row$gene, "_", row$celltype), type = "png", width = 8, height = 5, res = 300)
+  
+  #add annotation
+  pval_df <- master_genes %>% 
+  rownames_to_column("gene") %>%
+  filter(gene == row$gene) %>%
+  select(contains("p_val_adj")) %>%
+  pivot_longer(everything(), names_to = "annotation_broad", values_to = "p_val")
+
+  pval_df$annotation_broad <- gsub("\\.", "/",pval_df$annotation_broad)
+  pval_df$annotation_broad <- gsub("p_val_adj_", "", pval_df$annotation_broad)
+  pval_df$significant <- pval_df$p_val < 0.05
+
+  
+  plot_data <- FetchData(so_rna, vars = c(row$gene, "annotation_broad", "rna.splits"))
+  max_expr <- plot_data %>%
+    group_by(annotation_broad) %>%
+    summarize(y_pos = max(!!sym(row$gene), na.rm = TRUE)) %>%
+    mutate(y_pos = 4.5) %>%
+    filter(annotation_broad %in% pval_df$annotation_broad) %>%
+    left_join(pval_df, by = "annotation_broad") %>%
+    filter(significant)
+
+  p1 <- p1 + geom_text(data = max_expr,
+            aes(x = annotation_broad, y = y_pos + 0.2, label = "*"),
+            color = "red", size = 5, inherit.aes = F)
+
+  SaveFigure(p1, paste0("ctd_genes/", i, "_", row$gene, "_", row$celltype), type = "pdf", width = 8, height = 5, res = 300)
 }
 ```
 
@@ -371,8 +665,8 @@ plot_dia_vs_dev_peak <- function(
     tp1.color = "#6BAED6",
     tp2.name = "dev",
     tp2.color = "#FD8D3C",
-    extend.upstream = 5000,
-    extend.downstream = 5000,
+    extend.upstream = 1000,
+    extend.downstream = 1000,
     ymax = 100
 ){
   DefaultAssay(so) <- "ATAC"
@@ -407,14 +701,17 @@ plot_dia_vs_dev_peak <- function(
 
 ```
 
-##All Peaks
+
+##CTD Peaks
 ```{r}
 DefaultAssay(so) <- "ATAC"
-
-for(rownum in 19:nrow(ctd_peaks)){
+rownums = c(6, 8, 16, 206, 236)
+for(rownum in rownums){
   row = ctd_peaks[rownum,]
   cts <- gsub("\\.", "/",celltypes)
   plots <- list()
+  #get maximum y-range
+  max_y = 0
   for(i in 1:length(cts)){
     plot <- plot_dia_vs_dev_peak(
       so,
@@ -422,28 +719,152 @@ for(rownum in 19:nrow(ctd_peaks)){
       ident = gsub("\\.", "/", cts[i]), 
       tp1 = c("dia6d", "dia1mo"),
       tp2 = c("hb", "dev1d"),
-      ymax = 100
+      ymax = NA
+    )
+    plot_y = ggplot_build(plot)$layout$panel_params[[1]]$y.range[2]
+    if(plot_y > max_y){
+      max_y = plot_y
+    }
+  }
+  for(i in 1:length(cts)){
+    plot <- plot_dia_vs_dev_peak(
+      so,
+      peak = row$peak,
+      ident = gsub("\\.", "/", cts[i]), 
+      tp1 = c("dia6d", "dia1mo"),
+      tp2 = c("hb", "dev1d"),
+      ymax = max_y
     )
     plots[[i]] <- plot
   }
   gene_plot <- AnnotationPlot(
     so,
     region = row$peak,
-    extend.upstream = 5000,
-    extend.downstream = 5000
+    extend.upstream = 1000,
+    extend.downstream = 1000
   )
   plots[[i+1]] <- gene_plot
   p <- CombineTracks(
     plotlist = plots,
     heights = rep(1, 9)
   )
+  p
   
-  
-  SaveFigure(p, type = "png", paste0("ctd_peaks/", rownum, "_", row$peak, "_", row$celltype), height = 8, width = 5)
+  SaveFigure(p, type = "pdf", paste0("ctd_peaks/", rownum, "_", row$peak, "_", row$celltype), height = 8, width = 5)
 }
 
 ``` 
 
+##Global Peaks
+
+```{r}
+plot_global_peak <- function(
+    so,
+    peak,
+    ident,
+    tp1,
+    tp2,
+    tp1.name = "dia",
+    tp1.color = "#6BAED6",
+    tp2.name = "dev",
+    tp2.color = "#FD8D3C",
+    extend.upstream = 1000,
+    extend.downstream = 1000,
+    ymax = 100
+){
+  DefaultAssay(so) <- "ATAC"
+  
+  #create metadata column for timepoints
+  so$tp <- ifelse(so$timepoint %in% tp1, tp1.name, 
+                  ifelse(so$timepoint %in% tp2, tp2.name, "other"))
+  so$tp <- factor(so$tp, levels = c(tp1.name, tp2.name, "other"))
+  
+  #subset object by cell type given
+  Idents(so) <- "annotation_broad"
+  so_sub <- subset(so, idents = ident)
+  l <- levels(so_sub$tp)
+  so_sub$tp <- paste0(so_sub$tp, "_", ident)
+  so_sub$tp <- factor(so_sub$tp, levels = paste0(l, "_", ident))
+
+  #create coverage plot for cell type subset
+  Idents(so_sub) <- "tp"
+  ct_cov <- CoveragePlot(
+    object = so_sub,
+    region = peak,
+    annotation = F,
+    peaks = F,
+    links = F,
+    idents = levels(so_sub$tp)[1:2],
+    extend.upstream = extend.upstream,
+    extend.downstream = extend.downstream
+  ) & scale_fill_manual(values = c(tp1.color, tp2.color))
+  return(ct_cov)
+}
+
+```
+
+```{r}
+DefaultAssay(so) <- "ATAC"
+
+peak = "NC.029659.1-30193174-30194002"
+cts <- gsub("\\.", "/",celltypes)
+plots <- list()
+
+for(i in 1:length(cts)){
+  plot <- plot_global_peak(
+    so,
+    peak = peak,
+    ident = gsub("\\.", "/", cts[i]), 
+    tp1 = c("dia6d", "dia1mo"),
+    tp2 = c("hb", "dev1d"),
+    ymax = max_y
+  )
+  plots[[i]] <- plot
+}
+gene_plot <- AnnotationPlot(
+  so,
+  region = peak,
+  extend.upstream = 1000,
+  extend.downstream = 1000
+)
+plots[[i+1]] <- gene_plot
+p <- CombineTracks(
+  plotlist = plots,
+  heights = rep(1, 9)
+)
+
+SaveFigure(p, type = "pdf", paste0("global_peak_", peak), height = 8, width = 5)
+
+```
+
+
+```{r}
+tp1.name = "dia"
+tp1.color = "#6BAED6"
+tp2.name = "dev"
+tp2.color = "#FD8D3C"
+
+
+#create metadata column for timepoints
+so$tp <- ifelse(so$timepoint %in% tp1, tp1.name, 
+                ifelse(so$timepoint %in% tp2, tp2.name, "other"))
+so$tp <- factor(so$tp, levels = c(tp1.name, tp2.name, "other"))
+
+ct_cov <- CoveragePlot(
+  object = so_sub,
+  region = peak,
+  annotation = F,
+  peaks = F,
+  links = F,
+  idents = levels(so_sub$tp)[1:2],
+  extend.upstream = extend.upstream,
+  extend.downstream = extend.downstream,
+  ymax = ymax
+) & scale_fill_manual(values = c(tp1.color, tp2.color))
+
+
+
+```
 
 #Pseudobulking
 ```{r}
@@ -467,7 +888,7 @@ pseudobulk.de <- FindMarkers(
 pseudobulk.de
 ```
 
-#Peak Analysis
+#Clustering Analysis
 Category	Definition
 Opened	Low early, significantly increased accessibility later
 Closed	High early, significantly decreased later
@@ -475,7 +896,7 @@ Maintained	No significant change across timepoints
 Dynamically Regulated	Any significant non-monotonic or timepoint-specific accessibility pattern
 
 Method: peak by timepoint matrix
-
+##Peaks
 ```{r}
 DefaultAssay(so) <- "ATAC"
 
@@ -519,14 +940,14 @@ variable_peaks <- apply(zscore_matrix_dia, 1, sd)
 top_peaks <- order(variable_peaks, decreasing = TRUE)[1:5000]
 top_peaks <- zscore_matrix_dia[top_peaks, ]
 ```
-## Clustering options
+### Clustering options
 ```{r}
 library(RColorBrewer)
-k <- 6
+k <- 8
 cluster_colors <- setNames(brewer.pal(k, "Set2"), as.character(1:k))
 ```
 
-### hierarchical
+#### hierarchical
 ```{r}
 # Distance: Euclidean; Method: complete linkage
 dist_matrix <- dist(top_peaks, method = "euclidean")
@@ -543,75 +964,159 @@ pheatmap(top_peaks[order(peak_clusters_hclust),], cluster_rows = FALSE, cluster_
          annotation_row = data.frame(Cluster = factor(peak_clusters_hclust)), annotation_colors = list(Cluster = cluster_colors))
 ```
 
-### k-means
+#### k-means
 ```{r}
 set.seed(123)  # for reproducibility
-k <- 6
-kmeans_res <- kmeans(top_peaks, centers = k, nstart = 10)
 
-peak_clusters_kmeans <- kmeans_res$cluster
+for(k in c(3:8)){
+  kmeans_res <- kmeans(top_peaks, centers = k, nstart = 10)
 
-# Heatmap with cluster annotations
-pheatmap(top_peaks[order(peak_clusters_kmeans),], cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE,
-         annotation_row = data.frame(Cluster = factor(peak_clusters_kmeans)), annotation_colors = list(Cluster = cluster_colors))
+  peak_clusters_kmeans <- kmeans_res$cluster
+  
+  # Heatmap with cluster annotations
+  pheatmap(top_peaks[order(peak_clusters_kmeans),],
+           cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE,
+           annotation_row = data.frame(Cluster = factor(peak_clusters_kmeans)),
+           annotation_colors = list(Cluster = cluster_colors))
+  
+    # Prepare long-form dataframe
+  z_df <- as.data.frame(top_peaks)
+  z_df$Cluster <- factor(peak_clusters_kmeans)
+  z_df$peak <- rownames(z_df)
+  
+  long_df <- pivot_longer(
+    z_df, 
+    cols = -c(Cluster, peak),
+    names_to = "Timepoint", 
+    values_to = "Zscore"
+  )
+  
+  # Ensure Timepoint is ordered correctly (if it's character)
+  long_df$Timepoint <- factor(long_df$Timepoint, levels = c("hb", "dia1d", "dia2d", "dia6d", "dia1mo", "dia3mo"))
+  
+  # Summarize mean Z-score per cluster and timepoint
+  summary_df <- long_df %>%
+    group_by(Cluster, Timepoint) %>%
+    summarise(meanZ = mean(Zscore, na.rm = TRUE), .groups = "drop")
+  
+  # Plot with facets
+  p <- ggplot(summary_df, aes(x = Timepoint, y = meanZ, group = Cluster)) +
+    geom_line(aes(color = Cluster), size = 1.2) +
+    facet_wrap(~ Cluster, scales = "fixed") +  # One panel per cluster
+    scale_color_manual(values = cluster_colors) +
+    theme_minimal(base_size = 14) +
+    labs(
+      title = "Temporal Accessibility Dynamics per Cluster",
+      y = "Mean Z-score",
+      x = "Timepoint"
+    ) +
+    theme(legend.position = "none") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  plot(p)
+}
 
 ```
 
-### Fuzzy C-means
+##Genes
 ```{r}
-# Install and load the e1071 or Mfuzz package
-install.packages("e1071")  # OR install.packages("Mfuzz")
-library(e1071)
+DefaultAssay(so) <- "RNA"
 
-# Use cmeans from e1071
-k <- 6
-fcm_res <- cmeans(zscore_matrix, centers = k, m = 2)
+# Get the raw peak x cell matrix
+gene_matrix <- GetAssayData(so, layer = "counts")
 
-# Peak membership scores and max cluster assignment
-peak_membership <- fcm_res$membership
-peak_clusters_fuzzy <- apply(peak_membership, 1, which.max)
+# Timepoint metadata (replace "timepoint" with your actual column name)
+timepoints <- so$timepoint
 
-# Optional: filter on high-confidence memberships
-confident_peaks <- apply(peak_membership, 1, max) > 0.7
+# How many cells per timepoint? Choose the **minimum** across all timepoints
+min_cells <- min(table(timepoints))
 
-# Heatmap
-pheatmap(zscore_matrix[confident_peaks, ], cluster_rows = TRUE, cluster_cols = FALSE,
-         show_rownames = FALSE,
-         annotation_row = data.frame(Cluster = factor(peak_clusters_fuzzy[confident_peaks])))
+# Unique timepoints
+unique_tp <- unique(timepoints)
+
+# Initialize pseudobulk matrix
+pseudobulk_matrix <- matrix(0, nrow = nrow(gene_matrix), ncol = length(unique_tp))
+rownames(pseudobulk_matrix) <- rownames(gene_matrix)
+colnames(pseudobulk_matrix) <- unique_tp
+
+# For each timepoint: randomly subsample 'min_cells' and sum counts
+set.seed(123)  # for reproducibility
+
+for (tp in unique_tp) {
+  cells_tp <- colnames(so)[timepoints == tp]
+  
+  # Randomly sample min_cells
+  sampled_cells <- sample(cells_tp, size = min_cells, replace = FALSE)
+  
+  # Sum the counts across sampled cells
+  pseudobulk_matrix[, tp] <- Matrix::rowSums(gene_matrix[, sampled_cells, drop = FALSE])
+}
+
+
+# scale
+zscore_matrix <- t(scale(t(pseudobulk_matrix)))
+zscore_matrix_dia <- zscore_matrix[,c("hb", "dia1d", "dia2d", "dia6d", "dia1mo", "dia3mo")]
+
+# top variable peaks
+variable_genes <- apply(zscore_matrix_dia, 1, sd)
+top_genes <- order(variable_genes, decreasing = TRUE)[1:5000]
+top_genes <- zscore_matrix_dia[top_genes, ]
 ```
-
+### Clustering options
 ```{r}
-# Prepare long-form dataframe
-z_df <- as.data.frame(top_peaks)
-z_df$Cluster <- factor(peak_clusters_hclust)
-z_df$peak <- rownames(z_df)
-
-long_df <- pivot_longer(
-  z_df, 
-  cols = -c(Cluster, peak),
-  names_to = "Timepoint", 
-  values_to = "Zscore"
-)
-
-# Ensure Timepoint is ordered correctly (if it's character)
-long_df$Timepoint <- factor(long_df$Timepoint, levels = c("hb", "dia1d", "dia2d", "dia6d", "dia1mo", "dia3mo"))
-
-# Summarize mean Z-score per cluster and timepoint
-summary_df <- long_df %>%
-  group_by(Cluster, Timepoint) %>%
-  summarise(meanZ = mean(Zscore, na.rm = TRUE), .groups = "drop")
-
-# Plot with facets
-ggplot(summary_df, aes(x = Timepoint, y = meanZ, group = Cluster)) +
-  geom_line(aes(color = Cluster), size = 1.2) +
-  facet_wrap(~ Cluster, scales = "fixed") +  # One panel per cluster
-  scale_color_manual(values = cluster_colors) +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = "Temporal Accessibility Dynamics per Cluster",
-    y = "Mean Z-score",
-    x = "Timepoint"
-  ) +
-  theme(legend.position = "none") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+library(RColorBrewer)
+k <- 8
+cluster_colors <- setNames(brewer.pal(k, "Set2"), as.character(1:k))
 ```
+
+#### k-means
+```{r}
+set.seed(123)  # for reproducibility
+
+for(k in c(3:8)){
+  kmeans_res <- kmeans(top_genes, centers = k, nstart = 10)
+
+  gene_clusters_kmeans <- kmeans_res$cluster
+  
+  # Heatmap with cluster annotations
+  pheatmap(top_genes[order(gene_clusters_kmeans),],
+           cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE,
+           annotation_row = data.frame(Cluster = factor(gene_clusters_kmeans)),
+           annotation_colors = list(Cluster = cluster_colors))
+  
+    # Prepare long-form dataframe
+  z_df <- as.data.frame(top_genes)
+  z_df$Cluster <- factor(gene_clusters_kmeans)
+  z_df$gene <- rownames(z_df)
+  
+  long_df <- pivot_longer(
+    z_df, 
+    cols = -c(Cluster, gene),
+    names_to = "Timepoint", 
+    values_to = "Zscore"
+  )
+  
+  # Ensure Timepoint is ordered correctly (if it's character)
+  long_df$Timepoint <- factor(long_df$Timepoint, levels = c("hb", "dia1d", "dia2d", "dia6d", "dia1mo", "dia3mo"))
+  
+  # Summarize mean Z-score per cluster and timepoint
+  summary_df <- long_df %>%
+    group_by(Cluster, Timepoint) %>%
+    summarise(meanZ = mean(Zscore, na.rm = TRUE), .groups = "drop")
+  
+  # Plot with facets
+  p <- ggplot(summary_df, aes(x = Timepoint, y = meanZ, group = Cluster)) +
+    geom_line(aes(color = Cluster), size = 1.2) +
+    facet_wrap(~ Cluster, scales = "fixed") +  # One panel per cluster
+    scale_color_manual(values = cluster_colors) +
+    theme_minimal(base_size = 14) +
+    labs(
+      title = "Temporal Accessibility Dynamics per Cluster",
+      y = "Mean Z-score",
+      x = "Timepoint"
+    ) +
+    theme(legend.position = "none") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  plot(p)
+}
+
+```
+
 
